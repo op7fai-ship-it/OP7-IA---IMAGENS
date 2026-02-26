@@ -128,7 +128,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
       <div className="p-8 pb-3 border-b border-op7-border flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="flex items-center justify-center">
-            <img src="/logo op.png" alt="Logo OP7" className="h-12 w-auto object-contain" />
+            <img src="/logo_op.png" alt="Logo OP7" className="h-12 w-auto object-contain" />
           </div>
           <div className="flex flex-col">
             <h1 className="text-xl font-black text-op7-navy leading-none tracking-tight">OP7 <span className="text-op7-blue">IA</span></h1>
