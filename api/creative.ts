@@ -17,8 +17,11 @@ export default async function handler(req: any, res: any) {
     }
 
     if (!API_KEY) {
-        console.error("❌ [BACKEND ERROR] Nenhuma chave encontrada.");
-        return res.status(500).json({ error: "Chave de API não configurada no servidor." });
+        console.error("❌ [BACKEND ERROR] Faltou configurar ENV: GEMINI_API_KEY no Vercel");
+        return res.status(500).json({
+            error: "Erro de Configuração no Servidor: Chave de API não encontrada.",
+            detail: "Configure a variável GEMINI_API_KEY nas Settings > Environment Variables do seu projeto no Vercel."
+        });
     }
 
     const { prompt, imagePrompt, referenceImage, type } = req.body;
