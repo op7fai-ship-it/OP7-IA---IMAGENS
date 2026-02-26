@@ -6,9 +6,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
 
-  // 🔑 CHAVE DEFINITIVA (Inserida conforme solicitado pelo usuário)
-  const HARDCODED_KEY = "AIzaSyC0D5MCQ57o6wXNw8cUrWiwd2t5OjCkaYo";
-  const API_KEY = env.GEMINI_API_KEY || env.VITE_GEMINI_API_KEY || HARDCODED_KEY;
+  const API_KEY = env.GEMINI_API_KEY || env.VITE_GEMINI_API_KEY;
 
   return {
     server: {

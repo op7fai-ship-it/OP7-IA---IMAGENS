@@ -5,8 +5,8 @@ export const config = {
     runtime: 'nodejs',
 };
 
-// 🔑 CHAVE DE SEGURANÇA (Dada pelo usuário)
-const DEFINITIVE_KEY = "AIzaSyC0D5MCQ57o6wXNw8cUrWiwd2t5OjCkaYo";
+// 🔑 A chave agora é lida EXCLUSIVAMENTE das variáveis de ambiente (Environment Variables)
+const API_KEY = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
 
 export default async function handler(req: any, res: any) {
     // 1. Logs de Entrada
@@ -15,9 +15,6 @@ export default async function handler(req: any, res: any) {
     if (req.method !== 'POST') {
         return res.status(405).json({ error: "Method Not Allowed" });
     }
-
-    // 2. Chave de API
-    const API_KEY = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || DEFINITIVE_KEY;
 
     if (!API_KEY) {
         console.error("❌ [BACKEND ERROR] Nenhuma chave encontrada.");
