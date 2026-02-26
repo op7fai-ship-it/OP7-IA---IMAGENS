@@ -1,41 +1,40 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// 🚀 [BACKEND] Configurações para deploy no Vercel
+// 🚀 [BACKEND CONFIG] 
 export const config = {
     runtime: 'nodejs',
 };
 
-// Chave fornecida pelo usuário (Fallback Hardcoded para garantir funcionamento imediato)
-const FALLBACK_KEY = "AIzaSyC0D5MCQ57o6wXNw8cUrWiwd2t5OjCkaYo";
-const API_KEY = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || FALLBACK_KEY;
+// 🔑 CHAVE DE SEGURANÇA (Dada pelo usuário)
+const DEFINITIVE_KEY = "AIzaSyC0D5MCQ57o6wXNw8cUrWiwd2t5OjCkaYo";
 
 export default async function handler(req: any, res: any) {
-    // 1. Validar Método
+    // 1. Logs de Entrada
+    console.log("🛠️ [BACKEND] Recebendo Requisição:", req.method);
+
     if (req.method !== 'POST') {
-        res.setHeader('Allow', 'POST');
-        return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
+        return res.status(405).json({ error: "Method Not Allowed" });
     }
 
-    // 2. Validar Chave de API
-    console.log("🛠️ [SERVER] Validando conexão com Gemini...");
+    // 2. Chave de API
+    const API_KEY = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || DEFINITIVE_KEY;
+
     if (!API_KEY) {
-        console.error("❌ [SERVER] Chave de API ausente.");
-        return res.status(500).json({
-            error: "Faltou configurar a chave GEMINI_API_KEY.",
-            instruction: "Insira a chave no dashboard do Vercel ou verifique o arquivo .env.local"
-        });
+        console.error("❌ [BACKEND ERROR] Nenhuma chave encontrada.");
+        return res.status(500).json({ error: "Chave de API não configurada no servidor." });
     }
 
     const { prompt, imagePrompt, referenceImage, type } = req.body;
+    console.log("📋 [BACKEND DATA] Type:", type, "| Prompt:", prompt?.substring(0, 30));
+
     const genAI = new GoogleGenerativeAI(API_KEY);
 
     try {
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-        // TIPO 1: Geração Completa (Texto + Layout)
         if (type === 'full') {
             const aiInstructions = `
-                Como Diretor de Arte AI, crie um criativo para: "${prompt}".
+                Como Diretor de Arte Senior, analise: "${prompt}".
                 Retorne APENAS um JSON:
                 {
                   "content": {"headline": "...", "tagline": "...", "cta": "..."},
@@ -44,37 +43,48 @@ export default async function handler(req: any, res: any) {
                     "taglinePos": {"x": 50, "y": 55},
                     "ctaPos": {"x": 50, "y": 80}
                   },
-                  "imagePrompt": "Premium advertising background description in English"
+                  "imagePrompt": "Advertising background description"
                 }
             `;
             const result = await model.generateContent(aiInstructions);
-            const text = result.response.text();
-            const jsonStr = text.match(/\{[\s\S]*\}/)?.[0] || text;
-            return res.status(200).json(JSON.parse(jsonStr));
+            const response = await result.response;
+            const text = response.text();
+
+            // Extrair JSON com RegExp para evitar problemas com formatação Markdown da IA
+            const jsonPart = text.match(/\{[\s\S]*\}/)?.[0] || text;
+            const data = JSON.parse(jsonPart);
+
+            console.log("✅ [BACKEND SUCCESS] Full Response Ready");
+            return res.status(200).json(data);
         }
 
-        // TIPO 2: Geração de Imagem
         if (type === 'image') {
-            const parts: any[] = [{ text: `High resolution cinematic background for: ${imagePrompt}` }];
+            console.log("🖼️ [BACKEND IMAGE] Prompt:", imagePrompt);
+            const parts: any[] = [{ text: `Generate a premium background for: ${imagePrompt}` }];
             if (referenceImage) {
-                const matches = referenceImage.match(/^data:(.+);base64,(.+)$/);
-                if (matches?.length === 3) {
-                    parts.push({ inlineData: { mimeType: matches[1], data: matches[2] } });
+                const parts_img = referenceImage.split(',');
+                if (parts_img.length === 2) {
+                    const mime = parts_img[0].match(/:(.*?);/)?.[1] || 'image/png';
+                    parts.push({ inlineData: { mimeType: mime, data: parts_img[1] } });
                 }
             }
+
             const result = await model.generateContent({ contents: [{ role: 'user', parts }] });
-            const parts_res = result.response.candidates?.[0]?.content?.parts || [];
-            const imgData = parts_res.find(p => p.inlineData)?.inlineData?.data;
-            if (imgData) {
-                return res.status(200).json({ imageData: `data:image/png;base64,${imgData}` });
+            const response = await result.response;
+            const parts_res = response.candidates?.[0]?.content?.parts || [];
+
+            for (const part of parts_res) {
+                if (part.inlineData?.data) {
+                    return res.status(200).json({ imageData: `data:image/png;base64,${part.inlineData.data}` });
+                }
             }
-            throw new Error("Gemini não retornou dados de imagem.");
+            throw new Error("O Gemini não retornou a imagem. Certifique-se de que o modelo suporta geração de imagem.");
         }
 
-        return res.status(400).json({ error: "Tipo de requisição inválido" });
+        return res.status(400).json({ error: "Invalid Request Type" });
 
     } catch (error: any) {
-        console.error("❌ [SERVER ERROR]:", error);
+        console.error("❌ [BACKEND FATAL ERROR]:", error.message);
         return res.status(500).json({ error: error.message });
     }
 }
