@@ -122,6 +122,7 @@ export default async function handler(req: any, res: any) {
       }
 
       CRÍTICO: Nunca omita 'name' ou 'style'. Garanta que as cores da palette.accent sejam aplicadas visualmente no estilo do botão.
+      IMPORTANTE: A imagem principal gerada pela IA deve ser obrigatoriamente colocada na camada com id: "art".
     `;
 
     const parts: any[] = [
