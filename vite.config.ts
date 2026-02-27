@@ -6,7 +6,12 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
 
-  const API_KEY = env.GEMINI_API_KEY || env.VITE_GEMINI_API_KEY;
+  const API_KEY = env.GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+
+  // Anti-leak mechanism: fail the build if GEMINI is present in client bundle vars
+  if (env.VITE_GEMINI_API_KEY || Object.keys(env).some(k => k.includes('VITE_') && k.includes('GEMINI'))) {
+    throw new Error("🚨 SECURITY ALERT: Gemini API Key detectada sendo exposta ao frontend (Variável com prefixo VITE_). Construção abortada para evitar vazamentos.");
+  }
 
   return {
     server: {
@@ -111,6 +116,16 @@ export default defineConfig(({ mode }) => {
                       console.log("Modelo Gemini usado:", modelName);
                       const text = result.response.text();
                       const data = JSON.parse(text);
+
+                      // --- ENGINE SELECTION LOCAL ---
+                      if (options?.engine === 'imagen') {
+                        console.log("🎨 [LOCAL MOCK] Imagen engine selected");
+                        data.imageUrl = `https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2000&auto=format&fit=crop`;
+                        data.config.backgroundImage = data.imageUrl;
+                      } else {
+                        data.imageUrl = `https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&w=1080&q=80`;
+                        data.config.backgroundImage = data.imageUrl;
+                      }
 
                       let dbPayload = {};
                       try {

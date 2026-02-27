@@ -29,7 +29,8 @@ export const Composer: React.FC<ComposerProps> = ({ onGenerate, isGenerating, la
         tone: 'Premium',
         backgroundStyle: 'Clean',
         palette: defaultPalette,
-        useReferences: true
+        useReferences: true,
+        engine: 'nano'
     });
 
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -206,7 +207,19 @@ export const Composer: React.FC<ComposerProps> = ({ onGenerate, isGenerating, la
             {/* Options Panel */}
             {showOptions && (
                 <div className="flex flex-col gap-4 p-6 bg-white/40 backdrop-blur-xl border border-white/60 rounded-[28px] shadow-lg animate-in fade-in slide-in-from-top-4 duration-300">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-op7-navy uppercase tracking-widest">Engine de Imagem</label>
+                            <select
+                                value={options.engine}
+                                onChange={(e) => setOptions({ ...options, engine: e.target.value as 'nano' | 'imagen' })}
+                                className="w-full bg-op7-blue/5 border border-op7-blue/20 rounded-xl px-3 py-2 text-sm font-black text-op7-blue focus:ring-2 focus:ring-op7-blue/20 outline-none"
+                            >
+                                <option value="nano">🍌 Nano Banana</option>
+                                <option value="imagen">🔥 Imagen (Top)</option>
+                            </select>
+                        </div>
+
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-op7-navy uppercase tracking-widest">Formato</label>
                             <select

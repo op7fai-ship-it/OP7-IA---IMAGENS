@@ -90,6 +90,7 @@ export interface GenerationOptions {
   references?: ImageReference[];
   conversationId?: string | null;
   userId?: string;
+  engine?: 'nano' | 'imagen';
 }
 
 export interface GenerationProgress {
