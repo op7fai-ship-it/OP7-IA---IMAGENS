@@ -9,38 +9,67 @@
     href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Montserrat:wght@400;700;900&family=Bebas+Neue&family=Outfit:wght@400;700;900&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap"
     rel="stylesheet">
   <style>
+    :root {
+      --navy: #0F172A;
+      --blue: #2563EB;
+      --slate-50: #F8FAFC;
+    }
+
     body {
-      background-color: #F8FAFC;
+      background-color: var(--slate-50);
+      background-image:
+        radial-gradient(at 0% 0%, hsla(225, 39%, 30%, 0.05) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, hsla(217, 91%, 60%, 0.05) 0px, transparent 50%);
       color: #1E293B;
-      font-family: 'Inter', sans-serif;
+      font-family: 'Outfit', 'Inter', sans-serif;
       margin: 0;
       padding: 0;
       height: 100vh;
       overflow: hidden;
+      -webkit-font-smoothing: antialiased;
     }
 
-    /* Custom scrollbar for light premium theme */
+    /* Premium Glassmorphism */
+    .glass-effect {
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+
+    /* Custom scrollbar - Elegant & Thin */
     ::-webkit-scrollbar {
-      width: 6px;
+      width: 4px;
+      height: 4px;
     }
 
     ::-webkit-scrollbar-track {
-      background: #F1F5F9;
+      background: transparent;
     }
 
     ::-webkit-scrollbar-thumb {
-      background: #CBD5E1;
-      border-radius: 10px;
+      background: #E2E8F0;
+      border-radius: 20px;
     }
 
     ::-webkit-scrollbar-thumb:hover {
-      background: #94A3B8;
+      background: #CBD5E1;
     }
 
-    .glass-panel {
-      background: rgba(255, 255, 255, 0.8);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .animate-premium {
+      animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
   </style>
 </head>
