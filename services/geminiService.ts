@@ -1,68 +1,66 @@
-import { AdContent, Position } from "../types";
+import { DesignConfig, GenerationOptions, GenerationProgress } from "../types";
 
-export interface FullCreativeResponse {
-  content: AdContent;
-  layout: {
-    headlinePos: Position;
-    taglinePos: Position;
-    ctaPos: Position;
-  };
-  imagePrompt: string;
+export interface CreativeResponse {
+  headline: string;
+  description: string;
+  cta: string;
+  backgroundPrompt: string;
+  config: DesignConfig;
+  imageUrl?: string;
 }
 
-/**
- * 🔗 Conexão Segura com a API OP7 IA (Serverless)
- * Agora todas as requisições passam pelo backend seguro no Vercel.
- */
-export const generateFullCreative = async (prompt: string): Promise<FullCreativeResponse> => {
-  console.log("🛠️ [SERVICE] Chamando API /api/creative (Full)...");
+export const generateCreative = async (
+  prompt: string,
+  images: string[],
+  options: GenerationOptions,
+  onProgress?: (progress: GenerationProgress) => void
+): Promise<CreativeResponse> => {
+  console.log("🚀 [SERVICE] Iniciando geração Criativa...");
+
+  if (onProgress) onProgress({ step: 'Interpretando seu pedido...', percentage: 10 });
 
   try {
-    const response = await fetch('/api/creative', {
+    if (onProgress) onProgress({ step: 'Analisando nicho e tom...', percentage: 25 });
+
+    const response = await fetch('/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, type: 'full' })
+      body: JSON.stringify({
+        prompt,
+        images,
+        options,
+        format: options.format
+      })
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || "Erro desconhecido no servidor.");
+    const result = await response.json();
+
+    if (!response.ok || !result.ok) {
+      const errorMsg = result.error?.message || "Erro na comunicação com a IA.";
+      throw new Error(errorMsg);
     }
 
-    const data = await response.json();
-    return data as FullCreativeResponse;
+    if (onProgress) onProgress({ step: 'Gerando narrativa persuasiva...', percentage: 60 });
+
+    if (onProgress) onProgress({ step: 'Finalizando composição visual...', percentage: 90 });
+
+    // Pequeno delay para experiência visual
+    await new Promise(r => setTimeout(r, 600));
+
+    if (onProgress) onProgress({ step: 'Arte pronta!', percentage: 100 });
+
+    return result.data as CreativeResponse;
   } catch (error: any) {
-    console.error("❌ [SERVICE] Erro fatal:", error);
+    console.error("❌ [SERVICE ERROR]:", error.message);
     throw error;
   }
 };
 
-export const generateCreativeCopy = async (topic: string, audience: string): Promise<AdContent> => {
-  // Chamada via API genérica ou mantendo o full como principal
-  // Para manter a conformidade com o novo fluxo AI First, usamos o endpoint principal
-  const res = await generateFullCreative(topic);
-  return res.content;
-};
-
-export const generateCreativeImage = async (imagePrompt: string, referenceImageUrl?: string | null): Promise<string> => {
-  console.log("🛠️ [SERVICE] Chamando API /api/creative (Image)...");
-
-  try {
-    const response = await fetch('/api/creative', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ imagePrompt, referenceImage: referenceImageUrl, type: 'image' })
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || "Falha na geração de imagem.");
-    }
-
-    const data = await response.json();
-    return data.imageData;
-  } catch (error: any) {
-    console.error("❌ Error generating image:", error);
-    throw error;
-  }
+export const regenerateLayer = async (
+  currentConfig: DesignConfig,
+  target: 'all' | 'text' | 'art' | 'layout'
+): Promise<DesignConfig | null> => {
+  // Simplificado para usar o mesmo endpoint se necessário no futuro
+  // Por enquanto, retorna nulo ou mantém o atual
+  return null;
 };

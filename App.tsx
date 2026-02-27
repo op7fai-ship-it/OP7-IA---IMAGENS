@@ -1,110 +1,205 @@
-import React, { useState } from 'react';
-import { ControlPanel } from './components/ControlPanel';
-import { PreviewCanvas } from './components/PreviewCanvas';
-import { AdContent, DesignConfig, FontFamily, TextAlign } from './types';
+import React, { useState, useCallback, useRef } from 'react';
+import { Composer } from './components/Composer';
+import { CanvasEditor } from './components/CanvasEditor';
+import { DesignConfig, GenerationStatus, GenerationOptions, GenerationProgress, ProjectVersion } from './types';
+import { generateCreative, regenerateLayer } from './services/geminiService';
+import { Sparkles, MessageSquare, History, ChevronRight } from 'lucide-react';
+
+const INITIAL_CONFIG: DesignConfig = {
+  size: '1080x1350',
+  backgroundColor: '#F8FAFC',
+  backgroundImage: null,
+  overlayOpacity: 0.1,
+  overlayColor: '#000000',
+  layers: []
+};
 
 const App: React.FC = () => {
-  // Application State
-  const [creativePrompt, setCreativePrompt] = useState<string>('');
+  const [view, setView] = useState<'chat' | 'editor'>('chat');
+  const [config, setConfig] = useState<DesignConfig>(INITIAL_CONFIG);
+  const [status, setStatus] = useState<GenerationStatus>(GenerationStatus.IDLE);
+  const [progress, setProgress] = useState<GenerationProgress>({ step: 'Aguardando prompt...', percentage: 0 });
+  const [lastPrompt, setLastPrompt] = useState('');
 
-  const [content, setContent] = useState<AdContent>({
-    headline: 'OP7 IA - IMAGENS',
-    tagline: 'O Segredo dos Criativos que Escalavam 7 Dígitos',
-    cta: 'VER PLANOS'
-  });
+  // History / Versioning
+  const [history, setHistory] = useState<DesignConfig[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const [versions, setVersions] = useState<ProjectVersion[]>([]);
 
-  const [design, setDesign] = useState<DesignConfig>({
-    size: '1080x1350',
-    backgroundImage: null,
-    referenceImage: null,
-    logoImage: null,
-    overlayOpacity: 0.15,
-    cardOpacity: 0.8,
-    cardColor: '#ffffff',
+  const addToHistory = useCallback((newConfig: DesignConfig) => {
+    setHistory(prev => {
+      const newHistory = prev.slice(0, historyIndex + 1);
+      return [...newHistory, newConfig];
+    });
+    setHistoryIndex(prev => prev + 1);
+  }, [historyIndex]);
 
-    // Scale percentages (relative to width)
-    headlineScale: 2.5, // rem unit equivalent approx
-    taglineScale: 1.2,
-    ctaScale: 1.0,
+  const handleGenerate = async (prompt: string, images: string[], options: GenerationOptions) => {
+    setStatus(GenerationStatus.INTERPRETING);
+    setLastPrompt(prompt);
 
-    // Headline Defaults
-    headlineColor: '#002B5B', // OP7 Navy
-    headlineBgColor: 'transparent',
-    headlineFont: 'Montserrat',
-    headlineWeight: '900',
-    headlineAlign: 'center',
-    headlinePos: { x: 50, y: 30 },
+    try {
+      const result = await generateCreative(prompt, images, options, (p) => setProgress(p));
 
-    // Tagline Defaults
-    taglineColor: '#1A73E8', // OP7 Blue
-    taglineFont: 'Montserrat',
-    taglineWeight: '600',
-    taglineAlign: 'center',
-    taglinePos: { x: 50, y: 55 },
+      setConfig(result.config);
+      addToHistory(result.config);
+      setVersions(prev => [...prev, { id: `v${prev.length + 1}`, timestamp: Date.now(), config: result.config }]);
 
-    // CTA Defaults
-    ctaColor: '#ffffff',
-    ctaBgColor: '#FF7D3C', // OP7 Orange
-    ctaFont: 'Montserrat',
-    ctaWeight: '800',
-    ctaAlign: 'center',
-    ctaPos: { x: 50, y: 80 }
-  });
+      setStatus(GenerationStatus.SUCCESS);
+      setView('editor');
+    } catch (error: any) {
+      console.error(error);
+      setStatus(GenerationStatus.ERROR);
+      alert("Falha ao gerar o criativo: " + error.message);
+    }
+  };
+
+  const handleRegenerate = async (target: 'all' | 'text' | 'art' | 'layout') => {
+    if (target === 'all') {
+      // Redo the whole thing with same prompt
+      handleGenerate(lastPrompt, [], {}); // Simplified for now
+      return;
+    }
+
+    try {
+      setStatus(GenerationStatus.GENERATING_TEXT);
+      const newConfig = await regenerateLayer(config, target);
+      setConfig(newConfig);
+      addToHistory(newConfig);
+      setStatus(GenerationStatus.SUCCESS);
+    } catch (err) {
+      alert("Erro ao regenerar parte do criativo.");
+      setStatus(GenerationStatus.SUCCESS);
+    }
+  };
+
+  const undo = () => {
+    if (historyIndex > 0) {
+      setHistoryIndex(prev => prev - 1);
+      setConfig(history[historyIndex - 1]);
+    }
+  };
+
+  const redo = () => {
+    if (historyIndex < history.length - 1) {
+      setHistoryIndex(prev => prev + 1);
+      setConfig(history[historyIndex + 1]);
+    }
+  };
 
   return (
-    <div className="w-full h-screen flex overflow-hidden bg-op7-bg text-op7-text font-sans selection:bg-op7-blue selection:text-white">
-      {/* Sidebar Controls */}
-      <div className="flex-shrink-0 z-20 h-full border-r border-op7-border shadow-soft">
-        <ControlPanel
-          creativePrompt={creativePrompt}
-          setCreativePrompt={setCreativePrompt}
-          content={content}
-          setContent={setContent}
-          design={design}
-          setDesign={setDesign}
-        />
-      </div>
+    <div className="w-full h-screen flex flex-col bg-op7-bg overflow-hidden font-sans">
+      {/* Dynamic Header */}
+      <header className="h-20 bg-white/70 backdrop-blur-2xl border-b border-op7-border px-8 flex items-center justify-between z-40">
+        <div className="flex items-center gap-6">
+          <div className="flex flex-col">
+            <h1 className="text-xl font-black text-op7-navy tracking-tighter flex items-center gap-2">
+              OP7 <span className="text-op7-blue">IA</span>
+              <span className="text-[10px] bg-op7-blue/10 text-op7-blue px-2 py-0.5 rounded-full tracking-widest font-bold ml-2 uppercase">Imagens</span>
+            </h1>
+          </div>
 
-      {/* Main Preview Area */}
-      <main className="flex-1 relative bg-[#F1F5F9] flex flex-col items-center p-12 pt-16 overflow-auto scroll-smooth">
-        {/* Top Header / Toolbar Area */}
-        <div className="absolute top-0 left-0 right-0 h-16 bg-white/70 backdrop-blur-xl border-b border-op7-border flex items-center justify-between px-8 z-10 select-none">
-          <div className="flex items-center gap-4">
-            <div className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></div>
-            <div className="flex flex-col">
-              <span className="text-[10px] font-black text-op7-navy uppercase tracking-widest leading-none">Workshop Ativo</span>
-              <span className="text-[9px] font-bold text-op7-muted mt-0.5">ESTÚDIO DE INTELIGÊNCIA ARTIFICIAL</span>
+          {view === 'editor' && (
+            <div className="flex items-center gap-2 ml-4">
+              <div className="h-4 w-px bg-slate-200" />
+              <button
+                onClick={() => setView('chat')}
+                className="flex items-center gap-2 px-4 py-2 hover:bg-slate-50 rounded-xl text-xs font-bold text-slate-500 transition-all"
+              >
+                <MessageSquare size={14} /> Refinar Prompt
+              </button>
             </div>
-          </div>
-          <div className="flex items-center gap-6">
-            <div className="flex flex-col items-end">
-              <span className="text-[10px] font-black text-op7-navy uppercase tracking-widest leading-none">Formato Selecionado</span>
-              <span className="text-[10px] font-bold text-op7-blue mt-0.5">{design.size === '1080x1350' ? 'POST FEED (4:5)' : 'STORIES (9:16)'}</span>
-            </div>
-            <div className="h-8 w-px bg-op7-border"></div>
-            <div className="flex items-center gap-2 px-4 py-2 bg-op7-navy text-white rounded-full text-[10px] font-black uppercase tracking-widest cursor-pointer hover:bg-op7-blue transition-colors shadow-lg shadow-op7-navy/10">
-              Versão 1.0.4-AI
-            </div>
-          </div>
+          )}
         </div>
 
-        <div className="w-full max-w-6xl flex flex-col items-center">
-          <div className="w-full mb-8 flex items-center justify-between border-b border-op7-border/50 pb-4">
-            <h2 className="text-sm font-black text-op7-navy uppercase tracking-[0.2em]">Editor de Preview em Tempo Real</h2>
-            <div className="flex items-center gap-4">
-              <span className="text-[10px] font-bold text-op7-muted uppercase">Arraste e redimensione os blocos abaixo</span>
+        <div className="flex items-center gap-4">
+          {versions.length > 1 && (
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-full">
+              {versions.map((v, i) => (
+                <button
+                  key={v.id}
+                  onClick={() => {
+                    setConfig(v.config);
+                    addToHistory(v.config);
+                  }}
+                  className={`px-3 py-1.5 rounded-full text-[10px] font-black transition-all ${config === v.config ? 'bg-white text-op7-blue shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                >
+                  V{i + 1}
+                </button>
+              ))}
             </div>
-          </div>
+          )}
 
-          <PreviewCanvas content={content} setContent={setContent} design={design} setDesign={setDesign} />
+          <div className="h-10 w-px bg-slate-100" />
 
-          {/* Visual Footer for Context */}
-          <div className="mt-16 text-center pb-24 max-w-lg">
-            <p className="text-xs text-op7-muted font-medium leading-relaxed">
-              Este é um ambiente de criação assistida. Clique nos textos para editar inline ou arraste os blocos para redefinir o layout gerado pela IA.
-            </p>
+          <div className="flex flex-col items-end">
+            <span className="text-[10px] font-black text-op7-navy uppercase tracking-widest leading-none">Motor de IA</span>
+            <span className={`text-[10px] font-bold mt-1 uppercase flex items-center gap-1.5 ${status === GenerationStatus.SUCCESS ? 'text-green-500' : 'text-op7-blue animate-pulse'}`}>
+              <div className={`w-1.5 h-1.5 rounded-full ${status === GenerationStatus.SUCCESS ? 'bg-green-500' : 'bg-op7-blue shadow-[0_0_8px_rgba(26,115,232,0.5)]'}`} />
+              {status === GenerationStatus.IDLE ? 'Pronto' :
+                status === GenerationStatus.INTERPRETING ? 'Interpretando prompt...' :
+                  status === GenerationStatus.GENERATING_TEXT ? 'Gerando texto...' :
+                    status === GenerationStatus.GENERATING_ART ? 'Gerando arte...' :
+                      status === GenerationStatus.ASSEMBLING ? 'Montando layout...' :
+                        status === GenerationStatus.ERROR ? 'Erro na Geração' : 'Processando...'}
+            </span>
           </div>
         </div>
+      </header>
+
+      <main className="flex-1 relative overflow-hidden flex flex-col">
+        {view === 'chat' ? (
+          <div className="flex-1 flex flex-col items-center justify-center p-6 bg-gradient-to-b from-white to-slate-50">
+            <div className="w-full max-w-2xl text-center space-y-4 mb-12">
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-op7-navy text-white rounded-full text-[10px] font-black uppercase tracking-[0.2em] mb-4">
+                <Sparkles size={12} className="text-op7-accent" />
+                Powered by OP7 Intelligence
+              </div>
+              <h2 className="text-5xl font-black text-op7-navy tracking-tight leading-[0.9]">
+                Transforme ideias em <br />
+                <span className="text-op7-blue">Criativos de Elite</span>
+              </h2>
+              <p className="text-slate-500 font-medium max-w-lg mx-auto leading-relaxed">
+                A primeira IA do mercado focada em design psicológico para tráfego pago. Descreva seu produto e nós fazemos o resto.
+              </p>
+            </div>
+
+            <Composer
+              onGenerate={handleGenerate}
+              isGenerating={status !== GenerationStatus.IDLE && status !== GenerationStatus.SUCCESS && status !== GenerationStatus.ERROR}
+              lastPrompt={lastPrompt}
+            />
+
+            <div className="mt-12 flex items-center gap-8 text-slate-300">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 font-bold">1</div>
+                <span className="text-[10px] font-black uppercase tracking-widest">Prompt</span>
+              </div>
+              <ChevronRight size={14} />
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 font-bold">2</div>
+                <span className="text-[10px] font-black uppercase tracking-widest">Geração</span>
+              </div>
+              <ChevronRight size={14} />
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-op7-blue text-white flex items-center justify-center text-xs font-bold shadow-lg shadow-op7-blue/20">3</div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-op7-navy">Editor</span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <CanvasEditor
+            config={config}
+            setConfig={setConfig}
+            status={status}
+            progress={progress}
+            onRegenerate={handleRegenerate}
+            onUndo={undo}
+            onRedo={redo}
+            canUndo={historyIndex > 0}
+            canRedo={historyIndex < history.length - 1}
+          />
+        )}
       </main>
     </div>
   );
