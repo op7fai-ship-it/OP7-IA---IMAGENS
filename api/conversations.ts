@@ -56,7 +56,7 @@ export default async function handler(req: any, res: any) {
                 // Auto-title logic
                 let finalTitle = title;
                 if (!finalTitle && prompt) {
-                    finalTitle = prompt.split(' ').slice(0, 6).join(' ').replace(/[#@*]/g, '') + (prompt.split(' ').length > 6 ? '...' : '');
+                    finalTitle = prompt.split(' ').slice(0, 5).join(' ').replace(/[#@*]/g, '') + (prompt.split(' ').length > 5 ? '...' : '');
                 }
                 if (!finalTitle) finalTitle = "Nova Arte";
 

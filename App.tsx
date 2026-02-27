@@ -149,7 +149,7 @@ const App: React.FC = () => {
       // 2. Ensure Conversation Exists
       if (!currentConvId) {
         try {
-          const autoTitle = prompt_text.split(' ').slice(0, 6).join(' ').replace(/[#@*]/g, '') + (prompt_text.split(' ').length > 6 ? '...' : '');
+          const autoTitle = prompt_text.split(' ').slice(0, 5).join(' ').replace(/[#@*]/g, '') + (prompt_text.split(' ').length > 5 ? '...' : '');
           const res = await fetch('/api/conversations', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

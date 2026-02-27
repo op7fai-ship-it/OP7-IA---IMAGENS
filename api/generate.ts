@@ -1,5 +1,4 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import sharp from "sharp";
 import { requireEnv } from "../lib/env";
 import { toErrorResponse } from "../lib/api/error";
 
@@ -48,11 +47,11 @@ export default async function handler(req: any, res: any) {
 
       REGRAS DE OURO DE COMPOSIÇÃO:
       1. NÃO REPITAS LAYOUTS: Explore o canvas (0-100%) de forma inteligente. Use o espaço negativo.
-      2. MARGENS E RESPIRO: Mantenha elementos a pelo menos 5% de distância das bordas.
+      2. SAFE AREA OBRIGATÓRIA: Mantenha TODOS os elementos de texto e foco a pelo menos 10% de distância das bordas. Nunca deixe nada grudado (mínimo x: 10, máximo x: 90 / mínimo y: 10, máximo y: 90).
       3. RESPIRO ENTRE ELEMENTOS: Evite elementos "grudados". Mantenha pelo menos 8-10% de espaço (gap) entre a headline, a imagem principal e o CTA.
-      4. SISTEMA DE DESIGN COESO: Crie uma paleta de cores exclusiva para este anúncio que combine perfeitamente com o tema. Use cores com bom contraste para leitura.
+      4. SISTEMA DE DESIGN COESO: Crie uma paleta de cores exclusiva para este anúncio que combine perfeitamente com o tema.
       5. TIPOGRAFIA SELECIONADA: Use apenas fontes modernas: 'Montserrat' (Negrito/Impacto), 'Inter' (Clareza), 'Bebas Neue' (Chamariz/Headlines), 'Outfit' (Premium).
-      6. HIERARQUIA VISUAL: A Headline deve ser o elemento dominante, seguida pelo CTA.
+      6. COORDENADAS DINÂMICAS: Varie o layout. Não centralize tudo sempre. Use alinhamentos criativos (esquerda, direita) respeitando a Safe Area.
 
       JSON DE RESPOSTA (RIGOROSAMENTE ESTA ESTRUTURA):
       {
@@ -65,6 +64,7 @@ export default async function handler(req: any, res: any) {
             "primary": "#HEX (Cores dominantes do tema)",
             "secondary": "#HEX",
             "accent": "#HEX (Cor de alto contraste para o CTA)",
+            "surface": "#HEX (Cor para cards/painéis sobrepostos)",
             "background": "#HEX (Cor base ou fallback)",
             "text": "#HEX"
           }
@@ -136,23 +136,8 @@ export default async function handler(req: any, res: any) {
           const mimeType = match[1];
           const base64Data = match[2];
 
-          // Optimization: If image is small (< 4MB), send directly
-          if (base64Data.length < 5242880) {
-            parts.push({ inlineData: { mimeType, data: base64Data } });
-            continue;
-          }
-
-          try {
-            const buffer = Buffer.from(base64Data, 'base64');
-            const compressedBuffer = await sharp(buffer)
-              .resize({ width: 800, height: 800, fit: 'inside', withoutEnlargement: true })
-              .jpeg({ quality: 75 })
-              .toBuffer();
-            parts.push({ inlineData: { mimeType: 'image/jpeg', data: compressedBuffer.toString('base64') } });
-          } catch (sharpError) {
-            console.warn("⚠️ SHARP FAIL (fallback to base64):", sharpError);
-            parts.push({ inlineData: { mimeType, data: base64Data } });
-          }
+          // Optimization: Send base64 directly to Gemini to bypass server-side processing bottlenecks
+          parts.push({ inlineData: { mimeType, data: base64Data } });
         }
       }
     }

@@ -176,7 +176,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
             </div>
 
             {/* Main Workspace (Figma Style) */}
-            <div className="flex-1 relative flex flex-col items-center justify-center p-20 overflow-hidden bg-slate-200/50">
+            <div className="flex-1 relative flex flex-col items-center justify-center p-20 overflow-hidden bg-[#f3f4f6]">
 
                 {/* Status Badges */}
                 {showTooltip && (
