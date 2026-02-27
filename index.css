@@ -13,12 +13,13 @@
         @apply bg-op7-bg text-op7-navy font-sans antialiased;
         margin: 0;
         padding: 0;
-        height: 100vh;
-        overflow: hidden;
+        min-height: 100vh;
+        min-height: 100dvh;
+        overflow-x: hidden;
     }
 }
 
-/* Custom scrollbar */
+/* Scrollbar Premium Estilo Figma */
 ::-webkit-scrollbar {
     width: 6px;
 }
@@ -34,4 +35,11 @@
 
 ::-webkit-scrollbar-thumb:hover {
     background: #94A3B8;
+}
+
+/* Efeito de Vidro para Painéis */
+.glass-panel {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
 }

@@ -1,226 +1,100 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { requireEnv } from "../lib/env";
-import { toErrorResponse } from "../lib/api/error";
 
-// 🚀 ANTI-BUG: Rota imutável. UI depende de /api/generate
 export const runtime = 'nodejs';
 
-const MODELS = ["gemini-1.5-flash", "gemini-2.0-flash-exp", "gemini-flash-latest"];
-const IMAGEN_MODEL = "imagen-3.0-generate-001";
+// Prioridade para o modelo Flash (Gera layouts em < 5 segundos)
+const MODELS = ["gemini-1.5-flash", "gemini-2.0-flash-exp"];
 
 export default async function handler(req: any, res: any) {
+  // Garante que a resposta seja SEMPRE JSON para evitar erro de Syntax no frontend
   res.setHeader("Content-Type", "application/json");
 
   try {
-    const { prompt, images, options } = req.body;
-    console.log("Iniciando geração para prompt:", prompt?.substring(0, 50));
-
-    // 🛡️ FAIL-SAFE: Verificação Manual de Infraestrutura
-    if (!process.env.GEMINI_API_KEY) {
-      return res.status(500).json({ ok: false, error: 'Chave Gemini ausente no servidor' });
-    }
-
     if (req.method !== 'POST') {
       return res.status(405).json({ ok: false, error: "Apenas POST permitido" });
     }
 
-    const { format } = req.body;
-    const API_KEY = process.env.GEMINI_API_KEY;
-    const genAI = new GoogleGenerativeAI(API_KEY);
-    const engine = options?.engine === 'imagen' ? 'imagen' : 'nano';
-
-    if (!prompt || prompt.trim() === '') {
-      return res.status(400).json({ ok: false, error: "O prompt não pode estar vazio." });
+    const API_KEY = requireEnv();
+    if (!API_KEY) {
+      return res.status(500).json({ ok: false, error: "Chave Gemini não configurada no servidor." });
     }
 
-    const paletteObj = options?.palette || {
-      primary: '#002B5B',
-      secondary: '#1A73E8',
-      background: '#F8FAFC',
-      text: '#002B5B',
-      accent: '#FF7D3C'
-    };
+    const { prompt, format, images, options, conversationId, userId } = req.body;
 
-    const systemPrompt = `Aja como um Diretor de Arte. Crie designs modernos com espaços negativos. Nunca encoste elementos nas bordas (mantenha 10% de margem). Gere uma paleta de cores coesa no campo 'designSystem'.
+    if (!prompt) {
+      return res.status(400).json({ ok: false, error: "Prompt vazio." });
+    }
 
-      REGRAS ADICIONAIS DE COMPOSIÇÃO:
-      1. NÃO REPITAS LAYOUTS: Explore o canvas (0-100%) de forma inteligente.
-      2. SISTEMA DE DESIGN COESO: Crie uma paleta exclusiva no objeto "designSystem".
-      3. TIPOGRAFIA SELECIONADA: Use apenas fontes modernas: 'Montserrat', 'Inter', 'Bebas Neue', 'Outfit'.
-      4. COORDENADAS DINÂMICAS: Varie o layout. Não centralize tudo sempre. Use alinhamentos criativos (esquerda, direita) respeitando a margem de 10% (x e y devem estar no mínimo em 10 e no máximo em 90).
+    const genAI = new GoogleGenerativeAI(API_KEY);
+    const palette = options?.palette || { primary: '#002B5B', accent: '#FF7D3C', background: '#F8FAFC', text: '#002B5B' };
 
-      JSON DE RESPOSTA (RIGOROSAMENTE ESTA ESTRUTURA):
+    const systemPrompt = `
+      VOCÊ É UM DIRETOR DE ARTE DE ELITE.
+      OBJETIVO: Criar um layout de anúncio moderno e profissional.
+      
+      REGRAS DE DESIGN (CRÍTICO):
+      1. MARGENS: Mantenha pelo menos 12% de margem de respiro em todas as bordas. NUNCA grude elementos nos cantos.
+      2. COMPOSIÇÃO: Use o sistema de coordenadas 0-100. Espalhe os elementos harmonicamente.
+      3. TIPOGRAFIA: Use 'Montserrat' (900) para títulos.
+      4. CORES: Use primária ${palette.primary} e destaque ${palette.accent}.
+      
+      RETORNE APENAS O JSON:
       {
-        "headline": "Título persuasivo",
-        "description": "Copy curta de suporte",
-        "cta": "Texto do botão",
-        "backgroundPrompt": "Descrição 8K da cena de fundo, hyper-realistic, photorealistic, studio lighting",
-        "designSystem": {
-          "palette": {
-            "primary": "#HEX (Cores dominantes do tema)",
-            "secondary": "#HEX",
-            "accent": "#HEX (Cor de alto contraste para o CTA)",
-            "surface": "#HEX (Cor para cards/painéis sobrepostos)",
-            "background": "#HEX (Cor base ou fallback)",
-            "text": "#HEX"
-          }
-        },
+        "headline": "Título",
+        "description": "Subtítulo",
+        "cta": "Botão",
         "config": {
-          "size": "${format || options?.format || '1080x1350'}",
-          "backgroundColor": "palette.background (use o valor real do hex aqui)",
+          "size": "${format || '1080x1350'}",
+          "backgroundColor": "${palette.background}",
           "layers": [
-            {
-              "id": "art",
-              "type": "image",
-              "name": "Elemento Visual Principal",
-              "content": "PLACEHOLDER",
-              "position": {"x": 50, "y": 45},
-              "size": {"width": 80, "height": 60},
-              "style": {"borderRadius": 24, "objectFit": "contain"}
-            },
-            {
-              "id": "headline",
-              "type": "text",
-              "name": "Headline de Impacto",
-              "content": "TEXTO EM MAIÚSCULO",
-              "position": {"x": 50, "y": 20},
-              "size": {"width": 90, "height": 15},
-              "style": {
-                "color": "palette.text",
-                "fontSize": 4.5,
-                "fontWeight": "900",
-                "fontFamily": "Bebas Neue",
-                "textAlign": "center",
-                "textTransform": "uppercase",
-                "letterSpacing": "0.02em"
-              }
-            },
-            {
-              "id": "cta",
-              "type": "button",
-              "name": "Botão de Conversão",
-              "content": "AÇÃO AGORA",
-              "position": {"x": 50, "y": 85},
-              "size": {"width": 45, "height": 8},
-              "style": {
-                "backgroundColor": "palette.accent",
-                "color": "#FFFFFF",
-                "borderRadius": 50,
-                "fontSize": 1.1,
-                "fontWeight": "800",
-                "fontFamily": "Montserrat",
-                "padding": 20
-              }
-            }
+            { "id": "art", "type": "image", "name": "Visual", "position": {"x": 50, "y": 45}, "size": {"width": 80, "height": 55}, "style": {"borderRadius": 20} },
+            { "id": "headline", "type": "text", "name": "Título", "position": {"x": 50, "y": 20}, "style": {"fontSize": 4, "fontFamily": "Montserrat", "fontWeight": "900", "textAlign": "center", "color": "${palette.text}"} },
+            { "id": "cta", "type": "button", "name": "Botão", "position": {"x": 50, "y": 82}, "style": {"backgroundColor": "${palette.accent}", "borderRadius": 50, "color": "#FFFFFF", "fontSize": 1.2} }
           ]
         }
       }
-
-      CRÍTICO: Nunca omita 'name' ou 'style'. Garanta que as cores da palette.accent sejam aplicadas visualmente no estilo do botão.
-      IMPORTANTE: A imagem principal gerada pela IA deve ser obrigatoriamente colocada na camada com id: "art".
     `;
 
-    const parts: any[] = [
-      { text: systemPrompt },
-      { text: `CONTEXTO VISUAL: O usuário enviou ${images?.length || 0} imagens de referência abaixo. ANALISE-AS cuidadosamente para extrair estilo, cores, produtos e ambientação.` }
-    ];
-
-    if (options?.useReferences !== false && images && images.length > 0) {
-      for (const img of images) {
+    // Processamento ultra-rápido de imagens (sem Sharp)
+    const parts: any[] = [{ text: systemPrompt }];
+    if (images && images.length > 0) {
+      images.forEach((img: string) => {
         const match = img.match(/^data:(.*);base64,(.*)$/);
-        if (match) {
-          const mimeType = match[1];
-          const base64Data = match[2];
-
-          // Optimization: Send base64 directly to Gemini to bypass server-side processing bottlenecks
-          parts.push({ inlineData: { mimeType, data: base64Data } });
-        }
-      }
+        if (match) parts.push({ inlineData: { mimeType: match[1], data: match[2] } });
+      });
     }
+    parts.push({ text: `USUÁRIO PEDIU: ${prompt}` });
 
-    parts.push({ text: `PROMPT DO USUÁRIO: ${prompt}` });
+    const model = genAI.getGenerativeModel({ model: MODELS[0] });
+    const result = await model.generateContent({ contents: [{ role: 'user', parts }] });
+    const responseText = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
 
-    let lastError = null;
-    let data: any = null;
+    const data = JSON.parse(responseText);
 
-    for (const modelName of MODELS) {
-      try {
-        console.log(`🤖[BACKEND] trying model: ${modelName}`);
-        const model = genAI.getGenerativeModel({ model: modelName, generationConfig: { responseMimeType: "application/json" } });
-        const result = await model.generateContent({ contents: [{ role: 'user', parts }] });
-        const response = result.response;
-        data = JSON.parse(response.text());
+    // Placeholder de imagem elegante
+    const finalImg = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&w=1080";
+    data.imageUrl = finalImg;
+    data.config.backgroundImage = finalImg;
+    data.config.layers = data.config.layers.map((l: any) => l.id === 'art' ? { ...l, content: finalImg } : l);
 
-        // Check for multimodal image output
-        const imagePart = response.candidates[0]?.content?.parts?.find((p: any) => p.inlineData);
-        if (imagePart) {
-          console.log("📸 [BACKEND] Image found in Gemini output!");
-          data.image = {
-            kind: 'base64',
-            base64: `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`,
-            mimeType: imagePart.inlineData.mimeType
-          };
-        }
-        break;
-      } catch (error: any) {
-        lastError = error;
-        console.warn(`Model ${modelName} failed:`, error.message);
-        continue;
-      }
-    }
-
-    if (!data) {
-      return res.status(500).json({ ok: false, error: `Falha ao gerar na IA: ${lastError?.message || 'Erro desconhecido'}` });
-    }
-
-    // --- ENGINE / IMAGE HANDLING ---
-    if (!data.image) {
-      const engineImg = engine === 'imagen'
-        ? `https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format`
-        : `https://images.unsplash.com/photo-1557683316-973673baf926?auto=format`;
-
-      data.image = { kind: 'url', url: engineImg, mimeType: 'image/jpeg' };
-    }
-
-    const finalImgSrc = data.image.kind === 'base64' ? data.image.base64 : data.image.url;
-    data.imageUrl = finalImgSrc;
-
-    if (data.config) {
-      data.config.backgroundImage = finalImgSrc;
-      if (data.designSystem?.palette) {
-        data.config.palette = data.designSystem.palette;
-      }
-      if (data.config.layers) {
-        data.config.layers = data.config.layers.map((l: any) => {
-          // Priority 1: Map to 'art' ID if it exists
-          if (l.id === 'art') return { ...l, content: finalImgSrc };
-          // Priority 2: Fallback for generic image types if 'art' wasn't used
-          if (l.type === 'image' && l.content === 'PLACEHOLDER') return { ...l, content: finalImgSrc };
-          return l;
-        });
-      }
-    }
-
-    // --- DB SYNC ---
-    const { conversationId, userId } = req.body;
-    let dbPayload = {};
+    // SALVAMENTO AUTOMÁTICO NO SUPABASE (HISTÓRICO)
+    let messageId = null;
     if (conversationId && userId) {
       try {
         const { supabase } = await import('./lib/supabase');
-        const { data: assistantMessage } = await supabase
+        const { data: msg } = await supabase
           .from('messages')
           .insert([{ conversation_id: conversationId, user_id: userId, role: 'assistant', content: data }])
           .select().single();
-        dbPayload = { messageId: assistantMessage?.id };
-      } catch (dbErr) {
-        console.warn("DB SYNC ERROR:", dbErr);
-      }
+        messageId = msg?.id;
+      } catch (e) { console.error("Erro DB Sync"); }
     }
 
-    return res.status(200).json({ ok: true, data, ...dbPayload });
+    return res.status(200).json({ ok: true, data, messageId });
 
   } catch (error: any) {
-    console.error("💥 [BACKEND CRITICAL]:", error);
-    return res.status(500).json({ ok: false, error: error.message || 'Erro interno no servidor' });
+    console.error("💥 BACKEND CRITICAL ERROR:", error.message);
+    return res.status(500).json({ ok: false, error: error.message || "Erro interno." });
   }
 }
