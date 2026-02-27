@@ -198,6 +198,9 @@ export default async function handler(req: any, res: any) {
 
     if (data.config) {
       data.config.backgroundImage = finalImgSrc;
+      if (data.designSystem?.palette) {
+        data.config.palette = data.designSystem.palette;
+      }
       if (data.config.layers) {
         data.config.layers = data.config.layers.map((l: any) => {
           // Priority 1: Map to 'art' ID if it exists

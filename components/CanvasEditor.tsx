@@ -417,7 +417,12 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
                         </div>
                     ) : selectedLayerId ? (
                         <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
-                            <DiagnosticProps layer={config?.layers?.find(l => l.id === selectedLayerId) || (null as any)} setConfig={setConfig} isBackground={selectedLayerId === 'background'} />
+                            <DiagnosticProps 
+                                layer={config?.layers?.find(l => l.id === selectedLayerId) || (null as any)} 
+                                setConfig={setConfig} 
+                                isBackground={selectedLayerId === 'background'} 
+                                palette={config?.palette}
+                            />
                         </div>
                     ) : (
                         <div className="flex flex-col items-center justify-center py-20 text-center gap-4">
@@ -436,9 +441,43 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
     );
 };
 
-const DiagnosticProps: React.FC<{ layer: Layer; setConfig: any; isBackground?: boolean }> = ({ layer, setConfig, isBackground }) => {
-    if (isBackground) return <div className="text-xs text-slate-400 font-bold uppercase tracking-widest py-10 text-center border border-dashed rounded-3xl">Propriedades de Fundo Global</div>;
+const DiagnosticProps: React.FC<{ layer: Layer; setConfig: any; isBackground?: boolean; palette?: any }> = ({ layer, setConfig, isBackground, palette }) => {
+    if (isBackground) return (
+        <div className="space-y-8">
+            <h3 className="text-[10px] font-black text-op7-navy uppercase tracking-widest opacity-40">Design Global</h3>
+            <div className="space-y-4">
+                <div className="space-y-1.5">
+                    <label className="text-[9px] font-bold text-slate-400 uppercase">Fundo do Canvas</label>
+                    <div className="flex flex-wrap gap-2">
+                        {palette && Object.entries(palette).map(([name, hex]: [string, any]) => (
+                            <button
+                                key={name}
+                                onClick={() => setConfig((p: any) => ({ ...p, backgroundColor: hex }))}
+                                className="w-8 h-8 rounded-lg border border-slate-200 shadow-sm transition-transform hover:scale-110"
+                                style={{ backgroundColor: hex }}
+                                title={name}
+                            />
+                        ))}
+                        <input
+                            type="color"
+                            onChange={(e) => setConfig((p: any) => ({ ...p, backgroundColor: e.target.value }))}
+                            className="w-8 h-8 rounded-lg border border-slate-200 cursor-pointer"
+                        />
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+
     if (!layer) return null;
+
+    const updateStyle = (style: Partial<any>) => {
+        setConfig((p: any) => ({
+            ...p,
+            layers: p?.layers?.map((l: any) => l.id === layer?.id ? { ...l, style: { ...(l?.style || {}), ...style } } : l)
+        }));
+    };
+
     return (
         <div className="space-y-8">
             <div className="space-y-3">
@@ -452,39 +491,98 @@ const DiagnosticProps: React.FC<{ layer: Layer; setConfig: any; isBackground?: b
                         <label className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Posição Y</label>
                         <input type="number" value={Math.round(layer?.position?.y || 0)} onChange={(e) => setConfig((p: any) => ({ ...p, layers: p?.layers?.map((l: any) => l.id === layer?.id ? { ...l, position: { ...(l?.position || {}), y: parseInt(e.target.value) } } : l) }))} className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-xs font-black" />
                     </div>
-                </div>
-            </div>
-
-            {(layer?.type === 'text' || layer?.type === 'button') && (
-                <div className="space-y-6">
-                    <div className="space-y-3">
-                        <h3 className="text-[10px] font-black text-op7-navy uppercase tracking-widest opacity-40">Estilo de Texto</h3>
-                        <div className="space-y-4">
-                            <div className="space-y-1.5">
-                                <label className="text-[9px] font-bold text-slate-400 uppercase">Conteúdo</label>
-                                <textarea
-                                    value={layer?.content || ''}
-                                    onChange={(e) => setConfig((p: any) => ({ ...p, layers: p.layers.map((l: any) => l.id === layer?.id ? { ...l, content: e.target.value } : l) }))}
-                                    className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-medium min-h-[100px] resize-none focus:bg-white focus:ring-2 focus:ring-op7-blue/10 transition-all outline-none"
-                                />
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-[9px] font-bold text-slate-400 uppercase">Tipografia</label>
-                                <select
-                                    value={layer?.style?.fontFamily || 'Montserrat'}
-                                    onChange={(e) => setConfig((p: any) => ({ ...p, layers: p?.layers?.map((l: any) => l.id === layer?.id ? { ...l, style: { ...(l?.style || {}), fontFamily: e.target.value } } : l) }))}
-                                    className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-xs font-black"
-                                >
-                                    <option value="Montserrat">Montserrat</option>
-                                    <option value="Outfit">Outfit</option>
-                                    <option value="Bebas Neue">Bebas Neue</option>
-                                    <option value="Inter">Inter</option>
-                                </select>
-                            </div>
+                    <div className="space-y-1.5">
+                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Rotação</label>
+                        <div className="flex items-center gap-2">
+                            <input type="range" min="-180" max="180" value={layer?.style?.rotate || 0} onChange={(e) => updateStyle({ rotate: parseInt(e.target.value) })} className="flex-1 accent-op7-blue" />
+                            <span className="text-[10px] font-black text-slate-400 w-8">{layer?.style?.rotate || 0}°</span>
                         </div>
                     </div>
                 </div>
-            )}
+            </div>
+
+            <div className="space-y-6">
+                <div className="space-y-3">
+                    <h3 className="text-[10px] font-black text-op7-navy uppercase tracking-widest opacity-40">Conteúdo & Estilo</h3>
+                    <div className="space-y-4">
+                        {(layer?.type === 'text' || layer?.type === 'button') && (
+                            <div className="space-y-1.5">
+                                <label className="text-[9px] font-bold text-slate-400 uppercase">Texto</label>
+                                <textarea
+                                    value={layer?.content || ''}
+                                    onChange={(e) => setConfig((p: any) => ({ ...p, layers: p.layers.map((l: any) => l.id === layer?.id ? { ...l, content: e.target.value } : l) }))}
+                                    className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-medium min-h-[60px] resize-none focus:bg-white focus:ring-2 focus:ring-op7-blue/10 transition-all outline-none"
+                                />
+                            </div>
+                        )}
+
+                        {(layer?.type === 'text' || layer?.type === 'button') && (
+                            <>
+                                <div className="space-y-1.5">
+                                    <label className="text-[9px] font-bold text-slate-400 uppercase">Tipografia</label>
+                                    <select
+                                        value={layer?.style?.fontFamily || 'Montserrat'}
+                                        onChange={(e) => updateStyle({ fontFamily: e.target.value })}
+                                        className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-xs font-black shadow-sm"
+                                    >
+                                        <option value="Montserrat">Montserrat</option>
+                                        <option value="Outfit">Outfit</option>
+                                        <option value="Bebas Neue">Bebas Neue</option>
+                                        <option value="Inter">Inter</option>
+                                        <option value="Playfair Display">Playfair Display</option>
+                                    </select>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-[9px] font-bold text-slate-400 uppercase">Tamanho da Fonte</label>
+                                    <div className="flex items-center gap-3">
+                                        <input type="range" min="0.5" max="10" step="0.1" value={layer?.style?.fontSize || 1} onChange={(e) => updateStyle({ fontSize: parseFloat(e.target.value) })} className="flex-1 accent-op7-blue" />
+                                        <span className="text-[10px] font-black text-slate-400 w-10 text-right">{layer?.style?.fontSize || 1}rem</span>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-[9px] font-bold text-slate-400 uppercase">Cor do Texto</label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {palette && Object.entries(palette).map(([name, hex]: [string, any]) => (
+                                            <button
+                                                key={name}
+                                                onClick={() => updateStyle({ color: hex })}
+                                                className={`w-6 h-6 rounded-md border border-slate-200 transition-transform hover:scale-110 ${layer?.style?.color === hex ? 'ring-2 ring-op7-blue ring-offset-1' : ''}`}
+                                                style={{ backgroundColor: hex }}
+                                            />
+                                        ))}
+                                        <input type="color" value={layer?.style?.color || '#000000'} onChange={(e) => updateStyle({ color: e.target.value })} className="w-6 h-6 rounded-md border border-slate-200 cursor-pointer" />
+                                    </div>
+                                </div>
+                            </>
+                        )}
+
+                        {layer?.type === 'button' && (
+                            <>
+                                <div className="space-y-1.5">
+                                    <label className="text-[9px] font-bold text-slate-400 uppercase">Fundo do Botão</label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {palette && Object.entries(palette).map(([name, hex]: [string, any]) => (
+                                            <button
+                                                key={name}
+                                                onClick={() => updateStyle({ backgroundColor: hex })}
+                                                className={`w-6 h-6 rounded-md border border-slate-200 transition-transform hover:scale-110 ${layer?.style?.backgroundColor === hex ? 'ring-2 ring-op7-blue ring-offset-1' : ''}`}
+                                                style={{ backgroundColor: hex }}
+                                            />
+                                        ))}
+                                        <input type="color" value={layer?.style?.backgroundColor || '#000000'} onChange={(e) => updateStyle({ backgroundColor: e.target.value })} className="w-6 h-6 rounded-md border border-slate-200 cursor-pointer" />
+                                    </div>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[9px] font-bold text-slate-400 uppercase">Arredondamento: {layer?.style?.borderRadius || 0}px</label>
+                                    <input type="range" min="0" max="100" value={layer?.style?.borderRadius || 0} onChange={(e) => updateStyle({ borderRadius: parseInt(e.target.value) })} className="w-full accent-op7-blue" />
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
+            </div>
         </div>
     );
 };
