@@ -46,12 +46,34 @@ export default defineConfig(({ mode }) => {
 
                   const parts: any[] = [{ text: instructions }];
                   if (options?.useReferences !== false && images && images.length > 0) {
-                    images.forEach((img: string) => {
+                    for (const img of images) {
                       const match = img.match(/^data:(.*);base64,(.*)$/);
                       if (match) {
-                        parts.push({ inlineData: { mimeType: match[1], data: match[2] } });
+                        const mimeType = match[1];
+                        const base64Data = match[2];
+                        try {
+                          // Importante: No Vite config pode dar require() em runtime ou importar no topo
+                          const sharp = require('sharp');
+                          const buffer = Buffer.from(base64Data, 'base64');
+                          const compressedBuffer = await sharp(buffer)
+                            .resize({ width: 1024, height: 1024, fit: 'inside', withoutEnlargement: true })
+                            .jpeg({ quality: 80 })
+                            .toBuffer();
+
+                          const compressedBase64 = compressedBuffer.toString('base64');
+                          const sizeInMB = (compressedBase64.length * (3 / 4)) / (1024 * 1024);
+                          if (sizeInMB > 4) {
+                            res.statusCode = 400;
+                            return res.end(JSON.stringify({ ok: false, error: { code: "IMAGE_TOO_LARGE", message: "Referência muito pesada. Envie imagens menores." } }));
+                          }
+
+                          parts.push({ inlineData: { mimeType: 'image/jpeg', data: compressedBase64 } });
+                        } catch (err) {
+                          console.error("❌ [LOCAL ERROR] Falha ao comprimir:", err);
+                          parts.push({ inlineData: { mimeType, data: base64Data } });
+                        }
                       }
-                    });
+                    }
                   }
 
                   let lastError = null;

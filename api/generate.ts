@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import sharp from "sharp";
 
 // 🚀 OBRIGATÓRIO: Forçar runtime Node.js (não Edge) para máxima compatibilidade na Vercel
 export const runtime = 'nodejs';
@@ -108,12 +109,36 @@ export default async function handler(req: any, res: any) {
   const parts: any[] = [{ text: systemPrompt }, { text: `USUÁRIO PEDIU: ${prompt}` }];
 
   if (options?.useReferences !== false && images && images.length > 0) {
-    images.forEach((img: string) => {
+    for (const img of images) {
       const match = img.match(/^data:(.*);base64,(.*)$/);
       if (match) {
-        parts.push({ inlineData: { mimeType: match[1], data: match[2] } });
+        const mimeType = match[1];
+        const base64Data = match[2];
+        const buffer = Buffer.from(base64Data, 'base64');
+
+        try {
+          // Compress the image using sharp
+          const compressedBuffer = await sharp(buffer)
+            .resize({ width: 1024, height: 1024, fit: 'inside', withoutEnlargement: true })
+            .jpeg({ quality: 80 })
+            .toBuffer();
+
+          const compressedBase64 = compressedBuffer.toString('base64');
+
+          // Check size (~4MB limit for base64 string length)
+          const sizeInMB = (compressedBase64.length * (3 / 4)) / (1024 * 1024);
+          if (sizeInMB > 4) {
+            return res.status(400).json({ ok: false, error: { code: "IMAGE_TOO_LARGE", message: "Referência muito pesada. Envie imagens menores." } });
+          }
+
+          parts.push({ inlineData: { mimeType: 'image/jpeg', data: compressedBase64 } });
+        } catch (err) {
+          console.error("❌ [BACKEND ERROR] Falha ao comprimir imagem:", err);
+          // Fallback to original if compression fails unexpectedly
+          parts.push({ inlineData: { mimeType, data: base64Data } });
+        }
       }
-    });
+    }
   }
 
   let lastError = null;
