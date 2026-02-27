@@ -43,33 +43,37 @@ export default async function handler(req: any, res: any) {
     };
 
     const systemPrompt = `
-      VOCÊ É UM DIRETOR DE ARTE ELITE.
+      VOCÊ É UM DIRETOR DE ARTE DE ELITE.
       SEU OBJETIVO: Criar um anúncio visualmente deslumbrante e persuasivo.
 
       REGRAS CRÍTICAS:
       1. FIDELIDADE COR/ESTILO: Use a paleta: ${JSON.stringify(paletteObj)}.
       2. BACKGROUND: O 'backgroundPrompt' deve ser uma descrição detalhada 8k.
+      3. SE HOUVER IMAGENS ANEXADAS: Elas são sua REFERÊNCIA OBRIGATÓRIA. Analise o estilo, composição e produtos nelas e incorpore na sua descrição visual. NÃO IGNORE AS REFERÊNCIAS.
       
       FORMATO: ${format || options?.format || '1080x1350'}
 
       RETORNE RIGOROSAMENTE APENAS JSON:
       {
-        "headline": "Título curto",
-        "description": "Texto persuasivo",
-        "cta": "Botão",
-        "backgroundPrompt": "Descrição visual 8k",
+        "headline": "Título impacto",
+        "description": "Texto persuasivo curto",
+        "cta": "Texto do Botão",
+        "backgroundPrompt": "Descrição visual ultra-detalhada para gerar a imagem de fundo",
         "config": {
           "size": "${format || options?.format || '1080x1350'}",
           "backgroundColor": "${paletteObj.background}",
           "layers": [
-            { "id": "art", "type": "image", "content": "PLACEHOLDER", "position": {"x": 50, "y": 45}, "size": {"width": 65, "height": 45}, "style": {"borderRadius": 24} },
-            { "id": "headline", "type": "text", "content": "HEADLINE", "position": {"x": 50, "y": 25}, "size": {"width": 90, "height": 12}, "style": {"color": "${paletteObj.text}", "fontSize": 4.5, "fontWeight": "900", "textAlign": "center"} }
+            { "id": "art", "type": "image", "content": "PLACEHOLDER", "position": {"x": 50, "y": 45}, "size": {"width": 80, "height": 60}, "style": {"borderRadius": 24} },
+            { "id": "headline", "type": "text", "content": "HEADLINE IMPACTANTE", "position": {"x": 50, "y": 20}, "size": {"width": 90, "height": 15}, "style": {"color": "${paletteObj.text}", "fontSize": 4.5, "fontWeight": "900", "textAlign": "center", "fontFamily": "Montserrat"} }
           ]
         }
       }
     `;
 
-    const parts: any[] = [{ text: systemPrompt }, { text: `USUÁRIO PEDIU: ${prompt}` }];
+    const parts: any[] = [
+      { text: systemPrompt },
+      { text: `CONTEXTO VISUAL: O usuário enviou ${images?.length || 0} imagens de referência abaixo. ANALISE-AS cuidadosamente para extrair estilo, cores, produtos e ambientação.` }
+    ];
 
     if (options?.useReferences !== false && images && images.length > 0) {
       for (const img of images) {
@@ -90,6 +94,8 @@ export default async function handler(req: any, res: any) {
         }
       }
     }
+
+    parts.push({ text: `PROMPT DO USUÁRIO: ${prompt}` });
 
     let lastError = null;
     let data: any = null;

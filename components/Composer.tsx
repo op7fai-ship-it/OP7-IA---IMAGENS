@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Send, Image as ImageIcon, X, Sparkles, Sliders, ChevronDown, ChevronUp } from 'lucide-react';
 import { GenerationOptions, BackgroundStyle, ToneType, AdSize, ColorPalette } from '../types';
 
@@ -6,12 +6,32 @@ interface ComposerProps {
     onGenerate: (prompt: string, images: string[], options: GenerationOptions) => void;
     isGenerating: boolean;
     lastPrompt?: string;
+    initialImages?: string[];
+    onImagesChange?: (images: string[]) => void;
 }
 
-export const Composer: React.FC<ComposerProps> = ({ onGenerate, isGenerating, lastPrompt }) => {
+export const Composer: React.FC<ComposerProps> = ({ onGenerate, isGenerating, lastPrompt, initialImages = [], onImagesChange }) => {
     const [prompt, setPrompt] = useState(lastPrompt || '');
-    const [images, setImages] = useState<string[]>([]);
+    const [images, setImages] = useState<string[]>(initialImages);
     const [showOptions, setShowOptions] = useState(false);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        setImages(initialImages);
+    }, [initialImages]);
+
+    useEffect(() => {
+        if (!isGenerating && textareaRef.current) {
+            textareaRef.current.focus();
+        }
+    }, [isGenerating]);
+
+    const updateImages = (newImages: string[]) => {
+        setImages(newImages);
+        if (onImagesChange) onImagesChange(newImages);
+    };
+
     const defaultPalette: ColorPalette = {
         primary: '#002B5B',
         secondary: '#1A73E8',
@@ -33,232 +53,105 @@ export const Composer: React.FC<ComposerProps> = ({ onGenerate, isGenerating, la
         engine: 'nano'
     });
 
-    const fileInputRef = useRef<HTMLInputElement>(null);
-
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files || []);
         if (files.length === 0) return;
-
         const maxFiles = 5;
         const availableSlots = maxFiles - images.length;
-
-        if (availableSlots <= 0) {
-            alert(`Você só pode anexar até ${maxFiles} imagens.`);
-            return;
-        }
+        if (availableSlots <= 0) return;
 
         const filesToProcess = files.slice(0, availableSlots);
-
         filesToProcess.forEach((file: File) => {
-            if (file.size > 5 * 1024 * 1024) {
-                alert(`A imagem ${file.name} excede o limite de 5MB.`);
-                return;
-            }
+            if (file.size > 10 * 1024 * 1024) return;
             const reader = new FileReader();
             reader.onloadend = () => {
-                setImages(prev => [...prev, reader.result as string]);
+                updateImages([...images, reader.result as string]);
             };
             reader.readAsDataURL(file);
         });
-
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
     const removeImage = (index: number) => {
-        setImages(prev => prev.filter((_, i) => i !== index));
+        updateImages(images.filter((_, i) => i !== index));
     };
 
     const handleSubmit = (e?: React.FormEvent) => {
         e?.preventDefault();
         if (!prompt.trim() || isGenerating) return;
         onGenerate(prompt, images, options);
+        setPrompt(''); // Limpar após envio
     };
 
     const suggestions = [
         "Criativo para curso de tráfego pago",
         "Post para clínica de estética premium",
-        "Oferta direta para e-commerce de moda",
-        "Anúncio estilo lifestyle para mentorias"
+        "Oferta direta para e-commerce de moda"
     ];
 
     return (
-        <div className="w-full max-w-4xl mx-auto p-6 space-y-4">
-            {/* Options Panel (Moved above the input for better accessibility) */}
+        <div className="w-full max-w-4xl mx-auto px-6 pb-6">
+
             {showOptions && (
-                <div className="flex flex-col gap-4 p-6 bg-white/60 backdrop-blur-xl border border-white/80 rounded-[28px] shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-300 mb-2 border-b-4 border-b-op7-blue/20">
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div className="mb-4 p-6 bg-white/95 backdrop-blur-xl border border-slate-200 rounded-[32px] shadow-premium animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black text-op7-navy uppercase tracking-widest">Engine de Imagem</label>
-                            <select
-                                value={options.engine}
-                                title="Selecione o motor de geração"
-                                onChange={(e) => setOptions({ ...options, engine: e.target.value as 'nano' | 'imagen' })}
-                                className="w-full bg-op7-blue/5 border border-op7-blue/20 rounded-xl px-3 py-2 text-sm font-black text-op7-blue focus:ring-2 focus:ring-op7-blue/20 outline-none"
-                            >
-                                <option value="nano">🍌 Nano Banana</option>
+                            <label className="text-[10px] font-black text-op7-navy uppercase tracking-widest opacity-40">Motor</label>
+                            <select value={options.engine} onChange={(e) => setOptions({ ...options, engine: e.target.value as any })} className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-bold ring-op7-blue/10 focus:ring-2 outline-none">
+                                <option value="nano">🍌 Nano (Fast)</option>
                                 <option value="imagen">🔥 Imagen (Top)</option>
                             </select>
                         </div>
-
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black text-op7-navy uppercase tracking-widest">Formato</label>
-                            <select
-                                value={options.format}
-                                onChange={(e) => setOptions({ ...options, format: e.target.value as AdSize })}
-                                className="w-full bg-white border border-op7-border rounded-xl px-3 py-2 text-sm font-bold text-op7-navy focus:ring-2 focus:ring-op7-blue/20 outline-none"
-                            >
+                            <label className="text-[10px] font-black text-op7-navy uppercase tracking-widest opacity-40">Formato</label>
+                            <select value={options.format} onChange={(e) => setOptions({ ...options, format: e.target.value as any })} className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-bold outline-none">
                                 <option value="1080x1350">Feed (4:5)</option>
                                 <option value="1080x1920">Stories (9:16)</option>
                                 <option value="1080x1080">Quadrado (1:1)</option>
                             </select>
                         </div>
-
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black text-op7-navy uppercase tracking-widest">Tom</label>
-                            <select
-                                value={options.tone}
-                                onChange={(e) => setOptions({ ...options, tone: e.target.value as ToneType })}
-                                className="w-full bg-white border border-op7-border rounded-xl px-3 py-2 text-sm font-bold text-op7-navy focus:ring-2 focus:ring-op7-blue/20 outline-none"
-                            >
+                            <label className="text-[10px] font-black text-op7-navy uppercase tracking-widest opacity-40">Tom de Voz</label>
+                            <select value={options.tone} onChange={(e) => setOptions({ ...options, tone: e.target.value as any })} className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-bold outline-none">
                                 <option value="Premium">💎 Premium</option>
                                 <option value="Direto">🎯 Direto</option>
                                 <option value="Urgente">🔥 Urgente</option>
-                                <option value="Elegante">✨ Elegante</option>
                             </select>
                         </div>
-
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black text-op7-navy uppercase tracking-widest">Estilo do Fundo</label>
-                            <select
-                                value={options.backgroundStyle}
-                                onChange={(e) => setOptions({ ...options, backgroundStyle: e.target.value as BackgroundStyle })}
-                                className="w-full bg-white border border-op7-border rounded-xl px-3 py-2 text-sm font-bold text-op7-navy focus:ring-2 focus:ring-op7-blue/20 outline-none"
-                            >
+                            <label className="text-[10px] font-black text-op7-navy uppercase tracking-widest opacity-40">Background</label>
+                            <select value={options.backgroundStyle} onChange={(e) => setOptions({ ...options, backgroundStyle: e.target.value as any })} className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-bold outline-none">
                                 <option value="Clean">⚪ Clean</option>
                                 <option value="Tech">💻 Tech</option>
-                                <option value="Clínica">🏥 Clínica</option>
-                                <option value="Urbano">🏙️ Urbano</option>
                                 <option value="Minimalista">♟️ Minimalista</option>
                             </select>
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-op7-navy uppercase tracking-widest">Idioma</label>
-                            <select
-                                value={options.language}
-                                onChange={(e) => setOptions({ ...options, language: e.target.value })}
-                                className="w-full bg-white border border-op7-border rounded-xl px-3 py-2 text-sm font-bold text-op7-navy focus:ring-2 focus:ring-op7-blue/20 outline-none"
-                            >
-                                <option value="PT-BR">Brasil (PT-BR)</option>
-                                <option value="EN">English (EN)</option>
-                                <option value="ES">Espanol (ES)</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div className="border-t border-op7-border/20 pt-4">
-                        <div className="flex items-center justify-between mb-3">
-                            <label className="text-[10px] font-black text-op7-navy uppercase tracking-widest">Paleta de Cores</label>
-                            <button
-                                type="button"
-                                onClick={() => setOptions({ ...options, palette: defaultPalette })}
-                                className="text-[10px] font-bold text-op7-blue hover:underline"
-                            >
-                                Reset OP7
-                            </button>
-                        </div>
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                            {(['primary', 'secondary', 'background', 'text', 'accent'] as const).map(colorKey => (
-                                <div key={colorKey} className="flex flex-col gap-1">
-                                    <span className="text-[9px] font-bold text-slate-500 uppercase">{colorKey}</span>
-                                    <div className="flex items-center overflow-hidden rounded-lg border border-op7-border bg-white">
-                                        <input
-                                            type="color"
-                                            value={options.palette?.[colorKey] || '#000000'}
-                                            onChange={e => setOptions({
-                                                ...options,
-                                                palette: { ...options.palette!, [colorKey]: e.target.value }
-                                            })}
-                                            className="w-6 h-6 p-0 border-0 rounded-none cursor-pointer"
-                                        />
-                                        <input
-                                            type="text"
-                                            value={options.palette?.[colorKey] || '#000000'}
-                                            onChange={e => setOptions({
-                                                ...options,
-                                                palette: { ...options.palette!, [colorKey]: e.target.value }
-                                            })}
-                                            className="w-full text-xs font-medium px-2 py-1 outline-none uppercase"
-                                        />
-                                    </div>
-                                </div>
-                            ))}
                         </div>
                     </div>
                 </div>
             )}
 
             <div className="relative group">
-                <div className="absolute -inset-1 bg-gradient-to-r from-op7-blue to-op7-accent rounded-[32px] blur opacity-25 group-hover:opacity-40 transition duration-1000 group-hover:duration-200"></div>
-                <form
-                    onSubmit={handleSubmit}
-                    className="relative bg-white/80 backdrop-blur-2xl border border-white/40 shadow-2xl rounded-[28px] overflow-hidden transition-all duration-300 focus-within:ring-2 focus-within:ring-op7-blue/20"
-                >
-                    {/* Image Thumbnails & References UI */}
-                    {images.length > 0 && (
-                        <div className="flex flex-col gap-3 p-4 border-b border-op7-border/10 bg-white/30">
-                            <div className="flex items-center justify-between">
-                                <span className="text-[10px] font-black text-op7-navy uppercase tracking-widest bg-op7-blue/10 px-2 py-1 rounded-md">
-                                    Referências Anexadas: {images.length}/5
-                                </span>
+                <div className="absolute -inset-1 bg-gradient-to-r from-op7-blue/20 to-op7-accent/20 rounded-[35px] blur-lg opacity-0 group-focus-within:opacity-100 transition duration-500"></div>
+                <div className="relative bg-white border border-slate-200 shadow-premium rounded-[32px] overflow-hidden focus-within:border-op7-blue/30 transition-all">
 
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                    <span className={`text-[10px] font-bold uppercase tracking-wider ${options.useReferences ? 'text-op7-blue' : 'text-slate-400'}`}>
-                                        {options.useReferences ? 'Usando Referências' : 'Ignorar Referências'}
-                                    </span>
-                                    <div className="relative inline-flex items-center">
-                                        <input
-                                            type="checkbox"
-                                            className="sr-only peer"
-                                            checked={options.useReferences}
-                                            onChange={(e) => setOptions({ ...options, useReferences: e.target.checked })}
-                                        />
-                                        <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-op7-blue"></div>
-                                    </div>
-                                </label>
-                            </div>
-                            <div className="flex flex-wrap gap-3">
-                                {images.map((img, i) => (
-                                    <div key={i} className="relative group/img w-16 h-16 rounded-xl overflow-hidden shadow-md border-2 border-white">
-                                        <img src={img} className="w-full h-full object-cover" />
-                                        <button
-                                            type="button"
-                                            onClick={() => removeImage(i)}
-                                            className="absolute top-1 right-1 bg-black/60 text-white p-1 rounded-full opacity-0 group-hover/img:opacity-100 transition-opacity"
-                                        >
-                                            <X size={10} />
-                                        </button>
-                                    </div>
-                                ))}
-                                {images.length < 5 && (
-                                    <button
-                                        type="button"
-                                        onClick={() => fileInputRef.current?.click()}
-                                        className="w-16 h-16 rounded-xl border-2 border-dashed border-slate-300 flex items-center justify-center text-slate-400 hover:text-op7-blue hover:border-op7-blue transition-colors bg-white/50"
-                                    >
-                                        <ImageIcon size={20} />
-                                    </button>
-                                )}
-                            </div>
+                    {images.length > 0 && (
+                        <div className="flex gap-3 p-4 bg-slate-50/50 border-b border-slate-100 overflow-x-auto custom-scrollbar">
+                            {images.map((img, i) => (
+                                <div key={i} className="relative shrink-0 w-16 h-16 rounded-2xl overflow-hidden border-2 border-white shadow-sm group/img">
+                                    <img src={img} className="w-full h-full object-cover" />
+                                    <button onClick={() => removeImage(i)} className="absolute top-1 right-1 bg-black/60 text-white p-1 rounded-full opacity-0 group-hover/img:opacity-100 transition-opacity"><X size={10} /></button>
+                                </div>
+                            ))}
                         </div>
                     )}
 
                     <div className="flex flex-col">
                         <textarea
+                            ref={textareaRef}
                             value={prompt}
                             onChange={(e) => setPrompt(e.target.value)}
-                            placeholder="Descreva o criativo que você quer..."
-                            className="w-full bg-transparent p-6 text-lg font-medium outline-none resize-none min-h-[120px] placeholder:text-slate-400"
+                            placeholder="Descreva o anúncio perfeito para o seu negócio..."
+                            className="w-full bg-transparent p-6 text-base font-medium outline-none resize-none min-h-[100px] placeholder:text-slate-300"
                             onKeyDown={(e) => {
                                 if (e.key === 'Enter' && !e.shiftKey) {
                                     e.preventDefault();
@@ -267,66 +160,38 @@ export const Composer: React.FC<ComposerProps> = ({ onGenerate, isGenerating, la
                             }}
                         />
 
-                        <div className="flex items-center justify-between px-6 py-4 bg-slate-50/50">
+                        <div className="flex items-center justify-between px-6 py-4 bg-slate-50/30">
                             <div className="flex items-center gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => fileInputRef.current?.click()}
-                                    className="flex items-center gap-2 px-4 py-2 text-slate-600 hover:text-op7-blue hover:bg-white rounded-full transition-all text-sm font-bold shadow-sm border border-transparent hover:border-op7-blue/10"
-                                >
-                                    <ImageIcon size={18} />
-                                    <span>Anexar Referências</span>
-                                </button>
-                                <input
-                                    type="file"
-                                    ref={fileInputRef}
-                                    onChange={handleImageUpload}
-                                    multiple
-                                    accept="image/*"
-                                    className="hidden"
-                                />
-
-                                <button
-                                    type="button"
-                                    onClick={() => setShowOptions(!showOptions)}
-                                    className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all text-sm font-bold shadow-sm border ${showOptions ? 'bg-op7-blue text-white' : 'text-slate-600 hover:text-op7-blue hover:bg-white border-transparent hover:border-op7-blue/10'}`}
-                                >
-                                    <Sliders size={18} />
-                                    <span>Configurações</span>
-                                    {showOptions ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                                </button>
+                                <button type="button" onClick={() => fileInputRef.current?.click()} className="p-3 text-slate-400 hover:text-op7-blue hover:bg-white rounded-2xl transition-all"><ImageIcon size={20} /></button>
+                                <input type="file" ref={fileInputRef} onChange={handleImageUpload} multiple accept="image/*" className="hidden" />
+                                <button type="button" onClick={() => setShowOptions(!showOptions)} className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${showOptions ? 'bg-op7-blue text-white shadow-lg shadow-op7-blue/20' : 'text-slate-400 hover:bg-white border border-transparent hover:border-slate-100'}`}><Sliders size={14} /> Opções</button>
                             </div>
 
                             <button
-                                type="submit"
+                                onClick={handleSubmit}
                                 disabled={!prompt.trim() || isGenerating}
-                                className={`flex items-center gap-3 px-8 py-3 rounded-full font-black uppercase tracking-widest text-sm transition-all shadow-xl shadow-op7-blue/20 active:scale-95 ${!prompt.trim() || isGenerating ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-op7-navy text-white hover:bg-op7-blue'}`}
+                                className={`flex items-center gap-3 px-8 py-3.5 rounded-2xl font-black uppercase tracking-widest text-[11px] transition-all shadow-xl active:scale-95 ${!prompt.trim() || isGenerating ? 'bg-slate-100 text-slate-300 cursor-not-allowed' : 'bg-op7-navy text-white hover:bg-op7-blue shadow-op7-navy/20'}`}
                             >
                                 {isGenerating ? (
                                     <>
-                                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                        <span>Gerando...</span>
+                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                        <span>Processando...</span>
                                     </>
                                 ) : (
                                     <>
-                                        <Sparkles size={18} className="animate-pulse" />
-                                        <span>Gerar Arte</span>
+                                        <Sparkles size={16} />
+                                        <span>Gerar Criativo</span>
                                     </>
                                 )}
                             </button>
                         </div>
                     </div>
-                </form>
+                </div>
             </div>
 
-            {/* Quick Chips */}
-            <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+            <div className="flex flex-wrap items-center justify-center gap-2 mt-4">
                 {suggestions.map((s, i) => (
-                    <button
-                        key={i}
-                        onClick={() => setPrompt(s)}
-                        className="px-4 py-1.5 bg-white/40 hover:bg-white/80 border border-white/60 text-slate-600 hover:text-op7-blue rounded-full text-[11px] font-bold transition-all backdrop-blur-sm"
-                    >
+                    <button key={i} onClick={() => setPrompt(s)} className="px-4 py-1.5 bg-white border border-slate-100 text-slate-400 hover:text-op7-blue hover:border-op7-blue rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95">
                         {s}
                     </button>
                 ))}

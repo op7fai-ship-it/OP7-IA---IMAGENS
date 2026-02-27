@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { DesignConfig, Layer, Position, GenerationStatus, GenerationProgress } from '../types';
-import { Move, Maximize2, RotateCw, Type, Image as ImageIcon, MousePointer2, Layers, Settings2, Undo2, Redo2, ChevronLeft, Download, RefreshCw, Send, Sparkles } from 'lucide-react';
+import { Move, Maximize2, RotateCw, Type, Image as ImageIcon, MousePointer2, Layers, Settings2, Undo2, Redo2, ChevronLeft, Download, RefreshCw, Send, Sparkles, Lock, Unlock, Eye, EyeOff } from 'lucide-react';
 
 interface CanvasEditorProps {
     config: DesignConfig;
@@ -20,10 +20,14 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
     const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
     const [draggingId, setDraggingId] = useState<string | null>(null);
     const [resizingId, setResizingId] = useState<string | null>(null);
+    const [editingId, setEditingId] = useState<string | null>(null);
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
     const [snapLines, setSnapLines] = useState<{ x: number | null, y: number | null }>({ x: null, y: null });
     const [sidebarTab, setSidebarTab] = useState<'props' | 'layers'>('props');
     const [showTooltip, setShowTooltip] = useState(false);
+
+    const canvasRef = useRef<HTMLDivElement>(null);
+    const lastClickTime = useRef<number>(0);
 
     // 🛡️ PANIC UNLOCK LOCAL
     useEffect(() => {
@@ -32,39 +36,46 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
                 setSelectedLayerId(null);
                 setDraggingId(null);
                 setResizingId(null);
+                setEditingId(null);
             }
         };
         window.addEventListener('keydown', handleEsc);
         return () => window.removeEventListener('keydown', handleEsc);
     }, []);
 
-    const toggleLayerVisibility = (id: string, e: React.MouseEvent) => {
-        e.stopPropagation();
-        setConfig(prev => ({
-            ...prev,
-            layers: prev.layers.map(l => l.id === id ? { ...l, visible: l.visible === false } : l)
-        }));
-    };
-
-    const toggleLayerLock = (id: string, e: React.MouseEvent) => {
-        e.stopPropagation();
-        setConfig(prev => ({
-            ...prev,
-            layers: prev.layers.map(l => l.id === id ? { ...l, locked: !l.locked } : l)
-        }));
-    };
-
-    const canvasRef = useRef<HTMLDivElement>(null);
-
     const width = 1080;
     const height = config.size === '1080x1350' ? 1350 : config.size === '1080x1920' ? 1920 : 1080;
     const aspectRatio = width / height;
 
+    const handleLayerAction = useCallback((id: string, action: 'visible' | 'locked') => {
+        setConfig(prev => ({
+            ...prev,
+            layers: prev.layers.map(l => {
+                if (l.id !== id) return l;
+                if (action === 'visible') return { ...l, visible: l.visible === false };
+                return { ...l, locked: !l.locked };
+            })
+        }));
+    }, [setConfig]);
+
     const handleMouseDown = (layer: Layer, e: React.MouseEvent) => {
-        if ((e.target as HTMLElement).isContentEditable) return;
+        if (layer.locked || editingId === layer.id) return;
+
+        const now = Date.now();
+        const isDoubleClick = now - lastClickTime.current < 300;
+        lastClickTime.current = now;
+
+        if (isDoubleClick && (layer.type === 'text' || layer.type === 'button')) {
+            setEditingId(layer.id);
+            setSelectedLayerId(layer.id);
+            setDraggingId(null);
+            return;
+        }
+
         e.stopPropagation();
         setSelectedLayerId(layer.id);
         setDraggingId(layer.id);
+        setEditingId(null);
 
         if (canvasRef.current) {
             const rect = canvasRef.current.getBoundingClientRect();
@@ -82,6 +93,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
         e.preventDefault();
         setResizingId(layerId);
         setSelectedLayerId(layerId);
+        setEditingId(null);
     };
 
     useEffect(() => {
@@ -93,7 +105,6 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
                 let x = ((e.clientX - rect.left) / rect.width) * 100 - dragOffset.x;
                 let y = ((e.clientY - rect.top) / rect.height) * 100 - dragOffset.y;
 
-                // Snapping
                 const snap = 2;
                 let sx: number | null = null;
                 let sy: number | null = null;
@@ -110,10 +121,9 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
             if (resizingId) {
                 const layer = config.layers.find(l => l.id === resizingId);
                 if (!layer) return;
-
+                const rect = canvasRef.current.getBoundingClientRect();
                 const mouseX = ((e.clientX - rect.left) / rect.width) * 100;
                 const dist = Math.abs(mouseX - layer.position.x) * 2;
-
                 setConfig(prev => ({
                     ...prev,
                     layers: prev.layers.map(l => l.id === resizingId ? {
@@ -138,9 +148,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
         };
     }, [draggingId, resizingId, dragOffset, config.layers, setConfig]);
 
-    const selectedLayer = config.layers.find(l => l.id === selectedLayerId);
-
-    // 🎯 AUTO-SELEÇÃO: Focar na imagem gerada assim que terminar
+    // 🎯 AUTO-SELEÇÃO PÓS-GERAÇÃO
     useEffect(() => {
         if (status === GenerationStatus.SUCCESS && !selectedLayerId) {
             const artLayer = config.layers.find(l => l.id === 'art');
@@ -155,160 +163,125 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
     const isGenerating = status !== GenerationStatus.IDLE && status !== GenerationStatus.SUCCESS && status !== GenerationStatus.ERROR;
 
     return (
-        <div
-            className="flex h-full w-full overflow-hidden bg-slate-100 relative"
-            style={{ pointerEvents: isGenerating ? 'none' : 'auto' }}
-        >
-            {/* Tooltip Alert */}
-            {showTooltip && (
-                <div className="absolute top-24 left-1/2 -translate-x-1/2 bg-op7-navy text-white px-6 py-3 rounded-2xl shadow-2xl z-[110] animate-in slide-in-from-top-4 duration-500 flex items-center gap-3">
-                    <Sparkles className="text-op7-accent" size={18} />
-                    <p className="text-xs font-bold">Arraste para mover • Use cantos para redimensionar • Duplo clique para editar texto</p>
-                </div>
-            )}
+        <div className="flex h-full w-full overflow-hidden bg-[#F1F5F9] relative select-none">
 
             {/* Tool Sidebar */}
-            <div className="w-16 bg-white border-r border-op7-border flex flex-col items-center py-6 gap-6 z-30">
-                <button className="p-3 text-op7-blue bg-op7-blue/10 rounded-xl"><MousePointer2 size={24} /></button>
-                <button className="p-3 text-slate-400 hover:text-op7-navy"><Type size={24} /></button>
-                <button className="p-3 text-slate-400 hover:text-op7-navy"><ImageIcon size={24} /></button>
+            <div className="w-16 bg-white border-r border-slate-200 flex flex-col items-center py-6 gap-6 z-30 shadow-sm">
+                <button className="p-3 text-op7-blue bg-op7-blue/10 rounded-xl transition-all shadow-sm"><MousePointer2 size={22} /></button>
+                <button className="p-3 text-slate-400 hover:text-op7-navy hover:bg-slate-50 rounded-xl transition-all"><Type size={22} /></button>
+                <button className="p-3 text-slate-400 hover:text-op7-navy hover:bg-slate-50 rounded-xl transition-all"><ImageIcon size={22} /></button>
                 <div className="flex-1" />
-                <button onClick={onUndo} disabled={!canUndo} className={`p-3 ${canUndo ? 'text-slate-600 hover:text-op7-navy' : 'text-slate-200'}`}><Undo2 size={20} /></button>
-                <button onClick={onRedo} disabled={!canRedo} className={`p-3 ${canRedo ? 'text-slate-600 hover:text-op7-navy' : 'text-slate-200'}`}><Redo2 size={20} /></button>
+                <button onClick={onUndo} disabled={!canUndo} className={`p-3 rounded-xl transition-all ${canUndo ? 'text-slate-600 hover:bg-slate-50' : 'text-slate-200 cursor-not-allowed'}`}><Undo2 size={18} /></button>
+                <button onClick={onRedo} disabled={!canRedo} className={`p-3 rounded-xl transition-all ${canRedo ? 'text-slate-600 hover:bg-slate-50' : 'text-slate-200 cursor-not-allowed'}`}><Redo2 size={18} /></button>
             </div>
 
-            {/* Main Canvas Area */}
-            <div className="flex-1 relative flex flex-col items-center justify-center p-8 overflow-auto">
-                {/* Progress Bar (when generating) */}
-                {status !== GenerationStatus.SUCCESS && status !== GenerationStatus.IDLE && status !== GenerationStatus.ERROR && (
-                    <div className="absolute inset-0 bg-white/40 backdrop-blur-[2px] z-[100] flex items-center justify-center pointer-events-none">
-                        <div className="w-full max-w-md space-y-4 p-8 bg-white/90 rounded-3xl shadow-2xl border border-white pointer-events-auto">
-                            <div className="flex items-center justify-between text-[10px] font-black text-op7-navy uppercase tracking-widest">
-                                <span className="flex items-center gap-2"><div className="w-1.5 h-1.5 bg-op7-blue rounded-full animate-ping" /> {progress.step}</span>
-                                <span>{progress.percentage}%</span>
-                            </div>
-                            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                                <div
-                                    className="h-full bg-gradient-to-r from-op7-blue to-op7-accent transition-all duration-500"
-                                    style={{ width: `${progress.percentage}%` }}
-                                />
-                            </div>
-                        </div>
+            {/* Main Workspace */}
+            <div className="flex-1 relative flex flex-col items-center justify-center p-12 overflow-hidden bg-slate-50">
+
+                {/* Status Badges */}
+                {showTooltip && (
+                    <div className="absolute top-28 left-1/2 -translate-x-1/2 bg-op7-navy text-white px-6 py-3 rounded-2xl shadow-premium z-[110] animate-in slide-in-from-top-4 flex items-center gap-3 border border-white/10">
+                        <Sparkles className="text-op7-accent" size={16} />
+                        <p className="text-[10px] font-black uppercase tracking-widest">Editor Ativo • Dê duplo-clique no texto para editar</p>
                     </div>
                 )}
 
-                {/* Toolbar */}
-                <div className="absolute top-6 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-white/80 backdrop-blur-xl border border-white p-1.5 rounded-full shadow-premium z-30">
-                    <button onClick={() => onRegenerate('all')} className="flex items-center gap-2 px-4 py-2 hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-full transition-all">
+                {/* Main Toolbar */}
+                <div className="absolute top-8 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-white/90 backdrop-blur-2xl border border-white p-2 rounded-2xl shadow-premium z-30">
+                    <button onClick={() => onRegenerate('all')} className="flex items-center gap-2 px-4 py-2 hover:bg-op7-blue/5 text-op7-navy font-black text-[10px] uppercase tracking-widest rounded-xl transition-all border border-transparent hover:border-op7-blue/10">
                         <RefreshCw size={14} className="text-op7-blue" />
                         Regenerar Tudo
                     </button>
                     <div className="w-px h-6 bg-slate-100" />
-                    <button onClick={() => onRegenerate('text')} className="flex items-center gap-2 px-4 py-2 hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-full transition-all">
-                        <Type size={14} className="text-op7-blue" />
-                        Só Texto
+                    <button onClick={() => onRegenerate('text')} className="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 text-slate-500 font-bold text-[10px] uppercase tracking-widest rounded-xl transition-all">
+                        <Type size={14} /> Texto
                     </button>
-                    <button onClick={() => onRegenerate('art')} className="flex items-center gap-2 px-4 py-2 hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-full transition-all">
-                        <ImageIcon size={14} className="text-op7-blue" />
-                        Só Arte
+                    <button onClick={() => onRegenerate('art')} className="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 text-slate-500 font-bold text-[10px] uppercase tracking-widest rounded-xl transition-all">
+                        <ImageIcon size={14} /> Arte
                     </button>
                     <div className="w-px h-6 bg-slate-100" />
-                    <button className="bg-op7-navy text-white px-6 py-2 rounded-full font-black uppercase tracking-widest text-[10px] shadow-lg shadow-op7-navy/20 hover:bg-op7-blue transition-all">
-                        Exportar
+                    <button className="bg-op7-navy text-white px-6 py-2.5 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-xl shadow-op7-navy/20 hover:bg-op7-blue transition-all active:scale-95">
+                        Download
                     </button>
                 </div>
 
-                {/* Canvas Container */}
+                {/* Canvas Area */}
                 <div
-                    className="relative bg-white shadow-[0_60px_100px_-20px_rgba(0,0,0,0.2)] transition-all duration-500 rounded-sm overflow-hidden"
+                    className="relative bg-white shadow-[0_80px_100px_-30px_rgba(0,0,0,0.15)] transition-all duration-500 rounded-lg overflow-hidden border border-white"
                     style={{
                         width: '100%',
-                        maxWidth: `${Math.min(height, 800) * aspectRatio}px!important`,
+                        maxWidth: `${Math.min(height, 750) * aspectRatio}px`,
                         aspectRatio: `${aspectRatio}`,
-                        pointerEvents: (status === GenerationStatus.SUCCESS || status === GenerationStatus.IDLE) ? 'auto' : 'none'
+                        pointerEvents: (status === GenerationStatus.IDLE || status === GenerationStatus.SUCCESS || status === GenerationStatus.ERROR) ? 'auto' : 'none'
                     }}
-                    onMouseDown={(e) => {
-                        if (e.target === e.currentTarget) setSelectedLayerId(null);
-                    }}
+                    onMouseDown={(e) => { if (e.target === e.currentTarget) { setSelectedLayerId(null); setEditingId(null); } }}
                 >
-                    <div
-                        ref={canvasRef}
-                        className="w-full h-full relative overflow-hidden"
-                    >
-                        {/* Background */}
-                        <div className={`absolute inset-0 bg-white ${selectedLayerId === 'background' ? 'ring-4 ring-inset ring-op7-blue/50' : ''}`}
-                            onMouseDown={(e) => { e.stopPropagation(); setSelectedLayerId('background'); }}>
+                    <div ref={canvasRef} className="w-full h-full relative overflow-hidden bg-slate-50">
+
+                        {/* Background Layer */}
+                        <div className={`absolute inset-0 transition-all ${selectedLayerId === 'background' ? 'ring-4 ring-inset ring-op7-blue/30' : ''}`}
+                            onMouseDown={(e) => { e.stopPropagation(); setSelectedLayerId('background'); setEditingId(null); }}>
                             {config.backgroundImage ? (
-                                <img
-                                    key={config.generationId || 'bg'}
-                                    src={config.backgroundImage}
-                                    className="w-full h-full object-cover"
-                                    crossOrigin="anonymous"
-                                    onError={(e) => {
-                                        console.error("Erro ao carregar backgroundImage. Atribuindo fallback...");
-                                        e.currentTarget.src = 'https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&w=1080&q=80';
-                                    }}
-                                />
+                                <img src={config.backgroundImage} className="w-full h-full object-cover transition-opacity duration-700" crossOrigin="anonymous" />
                             ) : (
-                                <div className="w-full h-full bg-gradient-to-br from-slate-50 to-slate-200 flex items-center justify-center">
-                                    <Sparkles className="text-slate-300" size={100} />
+                                <div className="w-full h-full bg-gradient-to-tr from-slate-100 to-white flex items-center justify-center">
+                                    <Sparkles className="text-slate-200" size={80} />
                                 </div>
                             )}
-                            <div
-                                className="absolute inset-0"
-                                style={{ backgroundColor: config.overlayColor, opacity: config.overlayOpacity }}
-                            />
+                            <div className="absolute inset-0" style={{ backgroundColor: config.overlayColor, opacity: config.overlayOpacity }} />
                         </div>
 
-                        {/* Smart Guides */}
-                        {snapLines.x !== null && <div className="absolute top-0 bottom-0 left-1/2 w-[1px] bg-op7-blue z-[100] pointer-events-none" />}
-                        {snapLines.y !== null && <div className="absolute left-0 right-0 top-1/2 h-[1px] bg-op7-blue z-[100] pointer-events-none" />}
+                        {/* Guides */}
+                        {snapLines.x !== null && <div className="absolute top-0 bottom-0 left-1/2 w-[1px] bg-op7-blue/50 z-[100] pointer-events-none" />}
+                        {snapLines.y !== null && <div className="absolute left-0 right-0 top-1/2 h-[1px] bg-op7-blue/50 z-[100] pointer-events-none" />}
 
-                        {/* Layers */}
+                        {/* Creative Layers */}
                         {config.layers.map(layer => {
                             const isSelected = selectedLayerId === layer.id;
-                            const isDragging = draggingId === layer.id;
+                            const isEditing = editingId === layer.id;
+                            const isVisible = layer.visible !== false;
 
                             return (
                                 <div
                                     key={layer.id}
-                                    className={`absolute z-10 transition-shadow ${isSelected ? 'z-20' : ''}`}
+                                    className={`absolute z-10 ${isSelected ? 'z-20' : ''} ${!isVisible ? 'opacity-0 pointer-events-none' : ''}`}
                                     style={{
                                         top: `${layer.position.y}%`,
                                         left: `${layer.position.x}%`,
                                         width: `${layer.size.width}%`,
                                         transform: 'translate(-50%, -50%)',
-                                        cursor: isSelected ? 'default' : 'move',
-                                        visibility: (layer.visible !== false) ? 'visible' : 'hidden',
+                                        cursor: layer.locked ? 'not-allowed' : (isEditing ? 'text' : 'move'),
                                         pointerEvents: layer.locked ? 'none' : 'auto'
                                     }}
                                     onMouseDown={(e) => handleMouseDown(layer, e)}
                                 >
-                                    <div className={`relative w-full ${isSelected ? 'ring-2 ring-op7-blue shadow-2xl' : 'hover:ring-1 hover:ring-op7-blue/30'}`}>
+                                    <div className={`relative w-full group transition-all ${isSelected ? (isEditing ? '' : 'ring-2 ring-op7-blue shadow-2xl') : 'hover:ring-1 hover:ring-op7-blue/20'}`}>
+
                                         {layer.type === 'text' && (
                                             <div
-                                                contentEditable
+                                                contentEditable={isEditing}
                                                 suppressContentEditableWarning
                                                 onBlur={(e) => {
+                                                    setEditingId(null);
                                                     const newContent = e.currentTarget.innerText;
                                                     setConfig(prev => ({
                                                         ...prev,
                                                         layers: prev.layers.map(l => l.id === layer.id ? { ...l, content: newContent } : l)
                                                     }));
                                                 }}
-                                                className="w-full outline-none break-words"
+                                                className={`w-full outline-none break-words select-text ${isEditing ? 'cursor-text bg-white/10 ring-1 ring-op7-blue/50 p-1' : ''}`}
                                                 style={{
                                                     color: layer.style.color,
                                                     fontSize: `${layer.style.fontSize}rem`,
                                                     fontWeight: layer.style.fontWeight,
                                                     fontFamily: layer.style.fontFamily,
-                                                    textAlign: layer.style.textAlign,
+                                                    textAlign: layer.style.textAlign || 'center',
                                                     backgroundColor: layer.style.backgroundColor,
-                                                    padding: `${layer.style.padding}px`,
-                                                    borderRadius: `${layer.style.borderRadius}px`,
-                                                    textTransform: layer.style.textTransform,
-                                                    lineHeight: layer.style.lineHeight,
-                                                    letterSpacing: layer.style.letterSpacing,
+                                                    padding: `${layer.style.padding || 0}px`,
+                                                    borderRadius: `${layer.style.borderRadius || 0}px`,
+                                                    textTransform: layer.style.textTransform as any || 'none',
+                                                    lineHeight: layer.style.lineHeight || '1.1',
+                                                    letterSpacing: layer.style.letterSpacing || 'normal',
                                                     transform: `rotate(${layer.style.rotate || 0}deg)`
                                                 }}
                                             >
@@ -318,53 +291,35 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
 
                                         {layer.type === 'button' && (
                                             <div
-                                                className="w-full text-center flex items-center justify-center font-black uppercase tracking-widest shadow-xl"
+                                                className="w-full text-center flex items-center justify-center font-black uppercase tracking-widest shadow-lg"
                                                 style={{
                                                     color: layer.style.color,
                                                     backgroundColor: layer.style.backgroundColor,
                                                     fontSize: `${layer.style.fontSize}rem`,
-                                                    padding: `${layer.style.padding}px`,
-                                                    borderRadius: `${layer.style.borderRadius}px`,
+                                                    padding: `${layer.style.padding || 12}px`,
+                                                    borderRadius: `${layer.style.borderRadius || 12}px`,
                                                     transform: `rotate(${layer.style.rotate || 0}deg)`
                                                 }}
                                             >
-                                                <span
-                                                    contentEditable
-                                                    suppressContentEditableWarning
-                                                    onBlur={(e) => {
-                                                        const newContent = e.currentTarget.innerText;
-                                                        setConfig(prev => ({
-                                                            ...prev,
-                                                            layers: prev.layers.map(l => l.id === layer.id ? { ...l, content: newContent } : l)
-                                                        }));
-                                                    }}
-                                                    className="outline-none"
-                                                >
+                                                <span contentEditable={isEditing} suppressContentEditableWarning className="outline-none">
                                                     {layer.content}
                                                 </span>
                                             </div>
                                         )}
 
                                         {layer.type === 'image' && (
-                                            <img
-                                                key={`${layer.id}-${config.generationId || ''}`}
-                                                src={layer.content}
-                                                className="w-full h-auto pointer-events-none"
-                                                onError={(e) => {
-                                                    console.error(`Erro ao carregar layer ${layer.id}. Atribuindo fallback...`);
-                                                    e.currentTarget.src = 'https://images.unsplash.com/photo-1557683316-973673baf926?auto=format';
-                                                }}
-                                            />
+                                            <img src={layer.content} className="w-full h-auto pointer-events-none transition-transform duration-500" />
                                         )}
 
-                                        {/* Controls */}
-                                        {isSelected && (
+                                        {/* Resize & UI Indicators */}
+                                        {isSelected && !isEditing && (
                                             <>
-                                                <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-op7-navy text-white text-[10px] px-3 py-1.5 rounded-full font-black whitespace-nowrap shadow-xl">
+                                                <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-op7-navy text-white text-[9px] px-3 py-1.5 rounded-lg font-black whitespace-nowrap shadow-xl border border-white/10 flex items-center gap-2">
+                                                    {layer.locked ? <Lock size={10} /> : <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />}
                                                     {layer.name.toUpperCase()}
                                                 </div>
                                                 <div
-                                                    className="absolute -bottom-3 -right-3 w-6 h-6 bg-white border-2 border-op7-blue rounded-full flex items-center justify-center cursor-nwse-resize shadow-lg z-50 hover:scale-125 transition-transform"
+                                                    className="absolute -bottom-3 -right-3 w-7 h-7 bg-white border-2 border-op7-blue rounded-lg flex items-center justify-center cursor-nwse-resize shadow-premium z-50 hover:scale-110 transition-transform"
                                                     onMouseDown={(e) => handleResizeStart(layer.id, e)}
                                                 >
                                                     <Maximize2 size={12} className="text-op7-blue" />
@@ -377,289 +332,140 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
                         })}
                     </div>
                 </div>
+
+                {/* Progress Overlay */}
+                {isGenerating && (
+                    <div className="absolute inset-0 bg-white/60 backdrop-blur-[4px] z-[120] flex flex-col items-center justify-center p-8 animate-in fade-in duration-500">
+                        <div className="w-full max-w-sm bg-white p-8 rounded-[40px] shadow-premium border border-slate-100 flex flex-col items-center gap-6">
+                            <div className="relative">
+                                <div className="w-20 h-20 border-4 border-slate-100 rounded-full" />
+                                <div className="absolute inset-0 border-4 border-op7-blue rounded-full border-t-transparent animate-spin" />
+                                <Sparkles className="absolute inset-0 m-auto text-op7-blue animate-pulse" size={24} />
+                            </div>
+                            <div className="text-center">
+                                <h4 className="text-lg font-black text-op7-navy uppercase tracking-tighter mb-1">{progress.step}</h4>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Otimizando Design • {progress.percentage}%</p>
+                            </div>
+                            <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                <div className="h-full bg-op7-blue transition-all duration-700" style={{ width: `${progress.percentage}%` }} />
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
 
-            {/* Right Sidebar (Layers & Properties) */}
-            <div className="w-72 bg-white border-l border-op7-border flex flex-col z-30">
-                <div className="flex border-b border-op7-border">
-                    <button
-                        onClick={() => setSidebarTab('props')}
-                        className={`flex-1 py-4 text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${sidebarTab === 'props' ? 'text-op7-blue border-b-2 border-op7-blue' : 'text-slate-400 hover:text-slate-600'}`}>
+            {/* Sidebar Inspector */}
+            <div className="w-80 bg-white border-l border-slate-200 flex flex-col z-30 shadow-sm">
+                <div className="flex border-b border-slate-100 p-2">
+                    <button onClick={() => setSidebarTab('props')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 rounded-xl transition-all ${sidebarTab === 'props' ? 'bg-op7-blue/5 text-op7-blue' : 'text-slate-400 hover:text-slate-600'}`}>
                         <Settings2 size={14} /> Propriedades
                     </button>
-                    <button
-                        onClick={() => setSidebarTab('layers')}
-                        className={`flex-1 py-4 text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${sidebarTab === 'layers' ? 'text-op7-blue border-b-2 border-op7-blue' : 'text-slate-400 hover:text-slate-600'}`}>
+                    <button onClick={() => setSidebarTab('layers')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 rounded-xl transition-all ${sidebarTab === 'layers' ? 'bg-op7-blue/5 text-op7-blue' : 'text-slate-400 hover:text-slate-600'}`}>
                         <Layers size={14} /> Camadas
                     </button>
                 </div>
 
-                <div className="flex-1 overflow-auto p-6 space-y-8">
+                <div className="flex-1 overflow-auto px-6 py-8 space-y-8 h-full custom-scrollbar">
                     {sidebarTab === 'layers' ? (
                         <div className="space-y-4">
-                            <div className="flex items-center justify-between mb-2">
-                                <h3 className="text-[10px] font-black text-op7-navy uppercase tracking-[0.2em]">Lista de Camadas</h3>
-                            </div>
-                            <div className="space-y-2">
+                            <h3 className="text-[10px] font-black text-op7-navy uppercase tracking-widest opacity-40">Estrutura Visual</h3>
+                            <div className="grid gap-2">
                                 {config.layers.map(layer => (
                                     <div
                                         key={layer.id}
                                         onClick={() => setSelectedLayerId(layer.id)}
-                                        className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${selectedLayerId === layer.id ? 'bg-op7-blue/5 border-op7-blue/30' : 'bg-slate-50 border-slate-100'}`}
+                                        className={`group flex items-center justify-between p-3.5 rounded-2xl border transition-all cursor-pointer ${selectedLayerId === layer.id ? 'bg-op7-blue/5 border-op7-blue/20 shadow-sm' : 'bg-slate-50/50 border-slate-100 hover:border-slate-200'}`}
                                     >
                                         <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 shadow-sm">
-                                                {layer.type === 'text' ? <Type size={14} /> : layer.type === 'button' ? <Send size={14} /> : <ImageIcon size={14} />}
+                                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${selectedLayerId === layer.id ? 'bg-op7-blue text-white shadow-lg shadow-op7-blue/20' : 'bg-white text-slate-400 border border-slate-200'}`}>
+                                                {layer.type === 'text' ? <Type size={16} /> : layer.type === 'button' ? <Send size={16} /> : <ImageIcon size={16} />}
                                             </div>
-                                            <span className={`text-xs font-bold ${selectedLayerId === layer.id ? 'text-op7-blue' : 'text-op7-navy'}`}>{layer.name}</span>
+                                            <div>
+                                                <p className={`text-[11px] font-black uppercase tracking-tight ${selectedLayerId === layer.id ? 'text-op7-navy' : 'text-slate-600'}`}>{layer.name}</p>
+                                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{layer.type}</p>
+                                            </div>
                                         </div>
                                         <div className="flex items-center gap-1">
-                                            <button
-                                                onClick={(e) => toggleLayerVisibility(layer.id, e)}
-                                                className={`p-1.5 transition-colors ${layer.visible !== false ? 'text-slate-400 hover:text-op7-blue' : 'text-slate-200'}`}
-                                            >
-                                                {layer.visible !== false ? <ImageIcon size={14} /> : <ImageIcon size={14} className="opacity-40" />}
+                                            <button onClick={(e) => { e.stopPropagation(); handleLayerAction(layer.id, 'visible'); }} className="p-2 hover:bg-white rounded-lg transition-colors text-slate-400 hover:text-op7-blue">
+                                                {layer.visible !== false ? <Eye size={14} /> : <EyeOff size={14} className="opacity-40" />}
                                             </button>
-                                            <button
-                                                onClick={(e) => toggleLayerLock(layer.id, e)}
-                                                className={`p-1.5 transition-colors ${layer.locked ? 'text-op7-accent' : 'text-slate-400 hover:text-op7-blue'}`}
-                                            >
-                                                {layer.locked ? <Maximize2 size={14} /> : <Move size={14} />}
+                                            <button onClick={(e) => { e.stopPropagation(); handleLayerAction(layer.id, 'locked'); }} className={`p-2 hover:bg-white rounded-lg transition-colors ${layer.locked ? 'text-op7-accent' : 'text-slate-400 hover:text-op7-blue'}`}>
+                                                {layer.locked ? <Lock size={14} /> : <Unlock size={14} />}
                                             </button>
                                         </div>
                                     </div>
                                 ))}
-                                <div
-                                    onClick={() => setSelectedLayerId('background')}
-                                    className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${selectedLayerId === 'background' ? 'bg-op7-blue/5 border-op7-blue/30' : 'bg-slate-50 border-slate-100'}`}
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 shadow-sm">
-                                            <Sparkles size={14} />
-                                        </div>
-                                        <span className={`text-xs font-bold ${selectedLayerId === 'background' ? 'text-op7-blue' : 'text-op7-navy'}`}>Plano de Fundo</span>
-                                    </div>
-                                </div>
                             </div>
                         </div>
-                    ) : !selectedLayer && selectedLayerId !== 'background' ? (
-                        <div className="space-y-6">
-                            <div className="flex flex-col items-center justify-center text-slate-400 gap-2 mb-8 text-center bg-slate-50 p-4 rounded-xl border border-slate-100">
-                                <MousePointer2 size={24} className="opacity-50" />
-                                <p className="text-xs font-semibold">Clique num elemento para editá-lo</p>
-                            </div>
-
-                            <div className="space-y-4">
-                                <div className="flex items-center justify-between">
-                                    <h3 className="text-[10px] font-black text-op7-navy uppercase tracking-[0.2em]">Paleta Global</h3>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            const defaultPalette = {
-                                                primary: '#002B5B',
-                                                secondary: '#1A73E8',
-                                                background: '#F8FAFC',
-                                                text: '#002B5B',
-                                                accent: '#FF7D3C',
-                                                gradientEnabled: false,
-                                                gradientStart: '#002B5B',
-                                                gradientEnd: '#1A73E8',
-                                            };
-                                            setConfig(prev => ({ ...prev, palette: defaultPalette }));
-                                        }}
-                                        className="text-[10px] font-bold text-op7-blue hover:underline"
-                                    >
-                                        Reset OP7
-                                    </button>
-                                </div>
-                                <div className="space-y-3">
-                                    {(['primary', 'secondary', 'background', 'text', 'accent'] as const).map(colorKey => (
-                                        <div key={colorKey} className="flex items-center justify-between gap-3">
-                                            <span className="text-[10px] font-bold text-slate-500 uppercase flex-1">{colorKey}</span>
-                                            <div className="flex items-center overflow-hidden rounded-lg border border-op7-border bg-white w-32">
-                                                <input
-                                                    type="color"
-                                                    value={config.palette?.[colorKey] || '#000000'}
-                                                    onChange={e => setConfig(prev => ({
-                                                        ...prev,
-                                                        palette: {
-                                                            ...(prev.palette || {
-                                                                primary: '#002B5B', secondary: '#1A73E8', background: '#F8FAFC', text: '#002B5B', accent: '#FF7D3C', gradientEnabled: false, gradientStart: '#002B5B', gradientEnd: '#1A73E8'
-                                                            }),
-                                                            [colorKey]: e.target.value
-                                                        }
-                                                    }))}
-                                                    className="w-6 h-6 p-0 border-0 rounded-none cursor-pointer shrink-0"
-                                                />
-                                                <input
-                                                    type="text"
-                                                    value={config.palette?.[colorKey] || '#000000'}
-                                                    onChange={e => setConfig(prev => ({
-                                                        ...prev,
-                                                        palette: {
-                                                            ...(prev.palette || {
-                                                                primary: '#002B5B', secondary: '#1A73E8', background: '#F8FAFC', text: '#002B5B', accent: '#FF7D3C', gradientEnabled: false, gradientStart: '#002B5B', gradientEnd: '#1A73E8'
-                                                            }),
-                                                            [colorKey]: e.target.value
-                                                        }
-                                                    }))}
-                                                    className="w-full text-xs font-medium px-2 py-1 outline-none uppercase"
-                                                />
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <button
-                                onClick={() => {
-                                    if (!config.palette) return;
-                                    setConfig(prev => ({
-                                        ...prev,
-                                        backgroundColor: config.palette!.background,
-                                        layers: prev.layers.map(l => {
-                                            if (l.id === 'headline') return { ...l, style: { ...l.style, color: config.palette!.text } };
-                                            if (l.id === 'subheadline') return { ...l, style: { ...l.style, color: config.palette!.secondary } };
-                                            if (l.type === 'button') return { ...l, style: { ...l.style, backgroundColor: config.palette!.accent, color: '#FFFFFF' } };
-                                            return l;
-                                        })
-                                    }));
-                                }}
-                                className="w-full py-3 bg-op7-blue/10 text-op7-blue font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-op7-blue hover:text-white transition-all"
-                            >
-                                Aplicar no Criativo Inteiro
-                            </button>
+                    ) : selectedLayerId ? (
+                        <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
+                            <DiagnosticProps layer={config.layers.find(l => l.id === selectedLayerId)!} setConfig={setConfig} isBackground={selectedLayerId === 'background'} />
                         </div>
                     ) : (
-                        <>
-                            {/* Common Properties */}
-                            <div className="space-y-4">
-                                <h3 className="text-[10px] font-black text-op7-navy uppercase tracking-[0.2em]">Transformação</h3>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-1">
-                                        <label className="text-[9px] font-bold text-slate-400 uppercase">Posição X</label>
-                                        <input
-                                            type="number"
-                                            value={Math.round(selectedLayer.position.x)}
-                                            onChange={(e) => {
-                                                const val = parseInt(e.target.value);
-                                                setConfig(prev => ({
-                                                    ...prev,
-                                                    layers: prev.layers.map(l => l.id === selectedLayer.id ? { ...l, position: { ...l.position, x: val } } : l)
-                                                }));
-                                            }}
-                                            className="w-full bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 text-xs font-bold"
-                                        />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <label className="text-[9px] font-bold text-slate-400 uppercase">Posição Y</label>
-                                        <input
-                                            type="number"
-                                            value={Math.round(selectedLayer.position.y)}
-                                            onChange={(e) => {
-                                                const val = parseInt(e.target.value);
-                                                setConfig(prev => ({
-                                                    ...prev,
-                                                    layers: prev.layers.map(l => l.id === selectedLayer.id ? { ...l, position: { ...l.position, y: val } } : l)
-                                                }));
-                                            }}
-                                            className="w-full bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 text-xs font-bold"
-                                        />
-                                    </div>
-                                </div>
+                        <div className="flex flex-col items-center justify-center py-20 text-center gap-4">
+                            <div className="w-16 h-16 bg-slate-50 rounded-3xl flex items-center justify-center text-slate-200 border border-dashed border-slate-200">
+                                <MousePointer2 size={32} />
                             </div>
-
-                            {selectedLayer.type === 'text' || selectedLayer.type === 'button' ? (
-                                <div className="space-y-6">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-op7-navy uppercase tracking-[0.2em]">Conteúdo</label>
-                                        <textarea
-                                            value={selectedLayer.content}
-                                            onChange={(e) => {
-                                                const val = e.target.value;
-                                                setConfig(prev => ({
-                                                    ...prev,
-                                                    layers: prev.layers.map(l => l.id === selectedLayer.id ? { ...l, content: val } : l)
-                                                }));
-                                            }}
-                                            className="w-full bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 text-xs font-medium min-h-[80px]"
-                                        />
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-op7-navy uppercase tracking-[0.2em]">Tipografia</label>
-                                        <select
-                                            value={selectedLayer.style.fontFamily}
-                                            onChange={(e) => {
-                                                const val = e.target.value as any;
-                                                setConfig(prev => ({
-                                                    ...prev,
-                                                    layers: prev.layers.map(l => l.id === selectedLayer.id ? { ...l, style: { ...l.style, fontFamily: val } } : l)
-                                                }));
-                                            }}
-                                            className="w-full bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 text-xs font-bold"
-                                        >
-                                            <option value="Montserrat">Montserrat</option>
-                                            <option value="Bebas Neue">Bebas Neue</option>
-                                            <option value="Outfit">Outfit</option>
-                                            <option value="Inter">Inter</option>
-                                            <option value="Playfair Display">Playfair Display</option>
-                                        </select>
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-1">
-                                            <label className="text-[9px] font-bold text-slate-400 uppercase">Tamanho</label>
-                                            <input
-                                                type="number"
-                                                step="0.1"
-                                                value={selectedLayer.style.fontSize}
-                                                onChange={(e) => {
-                                                    const val = parseFloat(e.target.value);
-                                                    setConfig(prev => ({
-                                                        ...prev,
-                                                        layers: prev.layers.map(l => l.id === selectedLayer.id ? { ...l, style: { ...l.style, fontSize: val } } : l)
-                                                    }));
-                                                }}
-                                                className="w-full bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 text-xs font-bold"
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[9px] font-bold text-slate-400 uppercase">Cor</label>
-                                            <div className="flex gap-2">
-                                                <input
-                                                    type="color"
-                                                    value={selectedLayer.style.color}
-                                                    onChange={(e) => {
-                                                        const val = e.target.value;
-                                                        setConfig(prev => ({
-                                                            ...prev,
-                                                            layers: prev.layers.map(l => l.id === selectedLayer.id ? { ...l, style: { ...l.style, color: val } } : l)
-                                                        }));
-                                                    }}
-                                                    className="w-8 h-8 rounded-lg cursor-pointer overflow-hidden"
-                                                />
-                                                <input
-                                                    type="text"
-                                                    value={selectedLayer.style.color}
-                                                    onChange={(e) => {
-                                                        const val = e.target.value;
-                                                        setConfig(prev => ({
-                                                            ...prev,
-                                                            layers: prev.layers.map(l => l.id === selectedLayer.id ? { ...l, style: { ...l.style, color: val } } : l)
-                                                        }));
-                                                    }}
-                                                    className="flex-1 bg-slate-50 border border-slate-100 rounded-lg px-2 py-2 text-[10px] font-mono"
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            ) : null}
-                        </>
+                            <div>
+                                <h4 className="text-xs font-black text-op7-navy uppercase tracking-widest mb-1">Nada Selecionado</h4>
+                                <p className="text-[10px] text-slate-400 font-medium px-4">Selecione um elemento no canvas para ajustar suas propriedades.</p>
+                            </div>
+                        </div>
                     )}
                 </div>
             </div>
+        </div>
+    );
+};
+
+const DiagnosticProps: React.FC<{ layer: Layer; setConfig: any; isBackground?: boolean }> = ({ layer, setConfig, isBackground }) => {
+    if (isBackground) return <div className="text-xs text-slate-400 font-bold uppercase tracking-widest py-10 text-center border border-dashed rounded-3xl">Propriedades de Fundo Global</div>;
+    return (
+        <div className="space-y-8">
+            <div className="space-y-3">
+                <h3 className="text-[10px] font-black text-op7-navy uppercase tracking-widest opacity-40">Transformar</h3>
+                <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Posição X</label>
+                        <input type="number" value={Math.round(layer.position.x)} onChange={(e) => setConfig((p: any) => ({ ...p, layers: p.layers.map((l: any) => l.id === layer.id ? { ...l, position: { ...l.position, x: parseInt(e.target.value) } } : l) }))} className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-xs font-black" />
+                    </div>
+                    <div className="space-y-1.5">
+                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Posição Y</label>
+                        <input type="number" value={Math.round(layer.position.y)} onChange={(e) => setConfig((p: any) => ({ ...p, layers: p.layers.map((l: any) => l.id === layer.id ? { ...l, position: { ...l.position, y: parseInt(e.target.value) } } : l) }))} className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-xs font-black" />
+                    </div>
+                </div>
+            </div>
+
+            {(layer.type === 'text' || layer.type === 'button') && (
+                <div className="space-y-6">
+                    <div className="space-y-3">
+                        <h3 className="text-[10px] font-black text-op7-navy uppercase tracking-widest opacity-40">Estilo de Texto</h3>
+                        <div className="space-y-4">
+                            <div className="space-y-1.5">
+                                <label className="text-[9px] font-bold text-slate-400 uppercase">Conteúdo</label>
+                                <textarea
+                                    value={layer.content}
+                                    onChange={(e) => setConfig((p: any) => ({ ...p, layers: p.layers.map((l: any) => l.id === layer.id ? { ...l, content: e.target.value } : l) }))}
+                                    className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-medium min-h-[100px] resize-none focus:bg-white focus:ring-2 focus:ring-op7-blue/10 transition-all outline-none"
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-[9px] font-bold text-slate-400 uppercase">Tipografia</label>
+                                <select
+                                    value={layer.style.fontFamily}
+                                    onChange={(e) => setConfig((p: any) => ({ ...p, layers: p.layers.map((l: any) => l.id === layer.id ? { ...l, style: { ...l.style, fontFamily: e.target.value } } : l) }))}
+                                    className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-xs font-black"
+                                >
+                                    <option value="Montserrat">Montserrat</option>
+                                    <option value="Outfit">Outfit</option>
+                                    <option value="Bebas Neue">Bebas Neue</option>
+                                    <option value="Inter">Inter</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
