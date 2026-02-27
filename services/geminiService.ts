@@ -7,6 +7,7 @@ export interface CreativeResponse {
   backgroundPrompt: string;
   config: DesignConfig;
   imageUrl?: string;
+  messageId?: string;
 }
 
 export const generateCreative = async (
@@ -33,11 +34,41 @@ export const generateCreative = async (
       })
     });
 
-    const result = await response.json();
+    if (response.status === 204) {
+      throw new Error(`Resposta vazia do backend (Status: ${response.status})`);
+    }
+
+    const contentType = response.headers.get('content-type');
+    let result: any;
+
+    if (contentType && contentType.includes('application/json')) {
+      const text = await response.text();
+      if (!text || text.trim() === '') {
+        throw new Error(`Resposta vazia do backend ao parsear JSON (Status: ${response.status})`);
+      }
+      try {
+        result = JSON.parse(text);
+      } catch (parseErr) {
+        throw new Error(`Falha ao decodificar resposta JSON do servidor (Status: ${response.status})`);
+      }
+    } else {
+      const text = await response.text();
+      console.error(`Status: ${response.status}, Content-Type: ${contentType}`);
+      console.error("Resposta não-JSON do servidor:", text);
+      throw new Error(`Backend /api/generate não encontrado ou inválido. Status: ${response.status}`);
+    }
 
     if (!response.ok || !result.ok) {
-      const errorMsg = result.error?.message || "Erro na comunicação com a IA.";
-      throw new Error(errorMsg);
+      const complexError = result?.error || {
+        code: "UNKNOWN_NET_ERROR",
+        message: `Erro na comunicação com a IA (Status: ${response.status})`,
+        details: null
+      };
+
+      // Inject HTTP details
+      complexError.httpStatus = response.status;
+
+      throw new Error(JSON.stringify(complexError));
     }
 
     if (onProgress) onProgress({ step: 'Gerando narrativa persuasiva...', percentage: 60 });

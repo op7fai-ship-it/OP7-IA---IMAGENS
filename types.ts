@@ -87,6 +87,9 @@ export interface GenerationOptions {
   backgroundStyle?: BackgroundStyle;
   palette?: ColorPalette;
   useReferences?: boolean;
+  references?: ImageReference[];
+  conversationId?: string | null;
+  userId?: string;
 }
 
 export interface GenerationProgress {
