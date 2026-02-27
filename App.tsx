@@ -363,58 +363,69 @@ const App: React.FC = () => {
 
         <main className="flex-1 relative overflow-hidden flex flex-col bg-slate-50/50">
           {view === 'chat' ? (
-            <div className="absolute inset-0 flex flex-col">
-              <div className={`flex-1 overflow-y-auto w-full flex flex-col items-center p-6 bg-gradient-to-b from-white to-slate-50/30 ${messages.length === 0 ? 'justify-center' : 'justify-start'}`}>
-                {messages.length === 0 ? (
-                  <div className="w-full max-w-2xl text-center space-y-4 my-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
-                    <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-op7-navy text-white rounded-full text-[10px] font-black uppercase tracking-[0.2em] mb-4 shadow-lg shadow-op7-navy/20">
-                      <Sparkles size={12} className="text-op7-accent" />
-                      Powered by OP7 Intelligence
+            <div className="flex-1 overflow-y-auto scroll-smooth bg-gradient-to-b from-white to-slate-50/30">
+              <div className={`min-h-full w-full flex flex-col items-center p-6 md:p-12 ${messages.length === 0 ? 'justify-center' : 'justify-start'}`}>
+
+                {/* Content Wrapper */}
+                <div className="w-full max-w-4xl flex flex-col gap-8">
+
+                  {/* Hero Section (only if no messages) */}
+                  {messages.length === 0 && (
+                    <div className="text-center space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-700 py-12">
+                      <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-op7-navy text-white rounded-full text-[10px] font-black uppercase tracking-[0.2em] mb-4 shadow-lg shadow-op7-navy/20">
+                        <Sparkles size={12} className="text-op7-accent" />
+                        Powered by OP7 Intelligence
+                      </div>
+                      <h2 className="text-5xl md:text-6xl font-black text-op7-navy tracking-tight leading-[0.9]">
+                        Transforme ideias em <br />
+                        <span className="text-op7-blue bg-clip-text text-transparent bg-gradient-to-r from-op7-blue to-cyan-500">Criativos de Elite</span>
+                      </h2>
+                      <p className="text-slate-500 font-medium max-w-lg mx-auto leading-relaxed">
+                        A primeira IA do mercado focada em design psicológico para tráfego pago. Descreva seu produto e nós fazemos o resto.
+                      </p>
                     </div>
-                    <h2 className="text-5xl font-black text-op7-navy tracking-tight leading-[0.9]">
-                      Transforme ideias em <br />
-                      <span className="text-op7-blue bg-clip-text text-transparent bg-gradient-to-r from-op7-blue to-cyan-500">Criativos de Elite</span>
-                    </h2>
-                    <p className="text-slate-500 font-medium max-w-lg mx-auto leading-relaxed">
-                      A primeira IA do mercado focada em design psicológico para tráfego pago. Descreva seu produto e nós fazemos o resto.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="w-full max-w-4xl flex-1 mt-4 relative flex flex-col">
-                    <ChatStream
-                      messages={messages}
-                      onOpenEditor={loadPastGenerationEditor}
-                      isGenerating={status === GenerationStatus.INTERPRETING || status === GenerationStatus.GENERATING_ART || status === GenerationStatus.GENERATING_TEXT || status === GenerationStatus.ASSEMBLING}
+                  )}
+
+                  {/* Messages Stream */}
+                  {messages.length > 0 && (
+                    <div className="flex-1 min-h-[300px] flex flex-col">
+                      <ChatStream
+                        messages={messages}
+                        onOpenEditor={loadPastGenerationEditor}
+                        isGenerating={status === GenerationStatus.INTERPRETING || status === GenerationStatus.GENERATING_ART || status === GenerationStatus.GENERATING_TEXT || status === GenerationStatus.ASSEMBLING}
+                      />
+                    </div>
+                  )}
+
+                  {/* Composer Section */}
+                  <div className="w-full mt-auto pt-4 pb-20">
+                    <Composer
+                      onGenerate={handleGenerate}
+                      isGenerating={status !== GenerationStatus.IDLE && status !== GenerationStatus.SUCCESS && status !== GenerationStatus.ERROR}
+                      lastPrompt={lastPrompt}
                     />
                   </div>
-                )}
 
-                {messages.length === 0 && (
-                  <div className="mt-12 flex items-center gap-8 text-slate-300">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 font-bold">1</div>
-                      <span className="text-[10px] font-black uppercase tracking-widest">Prompt</span>
+                  {/* Onboarding Steps (only if no messages) */}
+                  {messages.length === 0 && (
+                    <div className="flex items-center justify-center gap-8 text-slate-300 pb-12">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 font-bold">1</div>
+                        <span className="text-[10px] font-black uppercase tracking-widest">Prompt</span>
+                      </div>
+                      <ChevronRight size={14} className="opacity-50" />
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 font-bold">2</div>
+                        <span className="text-[10px] font-black uppercase tracking-widest">Geração</span>
+                      </div>
+                      <ChevronRight size={14} className="opacity-50" />
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-op7-blue text-white flex items-center justify-center text-xs font-bold shadow-lg shadow-op7-blue/20">3</div>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-op7-navy">Editor</span>
+                      </div>
                     </div>
-                    <ChevronRight size={14} className="opacity-50" />
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 font-bold">2</div>
-                      <span className="text-[10px] font-black uppercase tracking-widest">Geração</span>
-                    </div>
-                    <ChevronRight size={14} className="opacity-50" />
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-op7-blue text-white flex items-center justify-center text-xs font-bold shadow-lg shadow-op7-blue/20">3</div>
-                      <span className="text-[10px] font-black uppercase tracking-widest text-op7-navy">Editor</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="w-full bg-white/40 backdrop-blur-sm border-t border-op7-border/10 p-4">
-                <Composer
-                  onGenerate={handleGenerate}
-                  isGenerating={status !== GenerationStatus.IDLE && status !== GenerationStatus.SUCCESS && status !== GenerationStatus.ERROR}
-                  lastPrompt={lastPrompt}
-                />
+                  )}
+                </div>
               </div>
             </div>
           ) : (
