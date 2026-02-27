@@ -222,7 +222,8 @@ const App: React.FC = () => {
       }
     } catch (error: any) {
       console.error("ERRO GERAÇÃO:", error);
-      setStatus(GenerationStatus.IDLE);
+      console.error("Erro detalhado da invocação:", error);
+      setStatus(GenerationStatus.ERROR);
       setErrorModalInfo({ title: "Erro na Geração", message: "A IA encontrou um problema ao processar seu pedido.", details: error.message });
     } finally {
       clearTimeout(panicTimer);

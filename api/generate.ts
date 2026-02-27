@@ -12,13 +12,14 @@ const IMAGEN_MODEL = "imagen-3.0-generate-001";
 export default async function handler(req: any, res: any) {
   res.setHeader("Content-Type", "application/json");
 
+  // 🛡️ FAIL-SAFE: Verificação Manual de Infraestrutura
+  if (!process.env.GEMINI_API_KEY) {
+    return res.status(500).json({ ok: false, error: 'Chave Gemini ausente no servidor' });
+  }
+
   try {
     console.log("HIT /api/generate");
-
-    const API_KEY = requireEnv();
-    if (!API_KEY) {
-      return res.status(500).json({ ok: false, error: "GEMINI_API_KEY não configurada no backend." });
-    }
+    const API_KEY = process.env.GEMINI_API_KEY;
 
     if (req.method !== 'POST') {
       return res.status(405).json({ ok: false, error: "Apenas POST permitido" });
