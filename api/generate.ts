@@ -59,7 +59,8 @@ export default async function handler(req: any, res: any) {
       4. CORES: Use a paleta: ${JSON.stringify(paletteObj)}.
 
       CRITICAL CONSTRAINTS:
-      - CRÍTICO: Todo objeto dentro do array 'layers' DEVE conter obrigatoriamente as chaves: 'id', 'type', 'name', 'content', 'position' e 'style'. Nunca omita o campo 'name'.
+      - CRITICAL: Every layer must have a 'name' and 'style' object. Never omit these fields.
+      - CRÍTICO: Todo objeto dentro do array 'layers' DEVE conter obrigatoriamente as chaves: 'id', 'type', 'name', 'content', 'position' e 'style'.
       - Use ID: "art" for the main product/subject image.
       - Use ID: "headline" for the main title text.
 

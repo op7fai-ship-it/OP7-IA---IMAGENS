@@ -3,11 +3,9 @@ import { Composer } from './components/Composer';
 import { CanvasEditor } from './components/CanvasEditor';
 import { Sidebar, Conversation } from './components/Sidebar';
 import { ChatStream } from './components/ChatStream';
-import { Diagnostics } from './components/Diagnostics';
-import { DebugPage } from './components/DebugPage';
 import { DesignConfig, GenerationStatus, GenerationOptions, GenerationProgress, ProjectVersion } from './types';
 import { generateCreative, regenerateLayer } from './services/geminiService';
-import { Sparkles, MessageSquare, ChevronRight, Activity, ShieldCheck, Terminal } from 'lucide-react';
+import { Sparkles, MessageSquare, ChevronRight } from 'lucide-react';
 
 const INITIAL_CONFIG: DesignConfig = {
   size: '1080x1350',
@@ -29,17 +27,11 @@ const getUserId = () => {
 
 const App: React.FC = () => {
   const [userId] = useState(getUserId());
-  const [view, setView] = useState<'chat' | 'editor' | 'debug'>('chat');
+  const [view, setView] = useState<'chat' | 'editor'>('chat');
   const [config, setConfig] = useState<DesignConfig>(INITIAL_CONFIG);
   const [status, setStatus] = useState<GenerationStatus>(GenerationStatus.IDLE);
   const [progress, setProgress] = useState<GenerationProgress>({ step: 'Aguardando prompt...', percentage: 0 });
   const [lastPrompt, setLastPrompt] = useState('');
-  const [isDiagnosticsOpen, setIsDiagnosticsOpen] = useState(false);
-  const [isSafeMode, setIsSafeMode] = useState(true);
-
-  // Debug Data
-  const [lastPayload, setLastPayload] = useState<any>(null);
-  const [lastResponse, setLastResponse] = useState<any>(null);
 
   // Sidebar Logic
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -78,22 +70,6 @@ const App: React.FC = () => {
   useEffect(() => {
     fetchConversations();
   }, [fetchConversations]);
-
-  // Handle URL Routing / Hash
-  useEffect(() => {
-    const checkPath = () => {
-      if (window.location.pathname === '/debug' || window.location.hash === '#debug') {
-        setView('debug');
-      }
-    };
-    checkPath();
-    window.addEventListener('popstate', checkPath);
-    window.addEventListener('hashchange', checkPath);
-    return () => {
-      window.removeEventListener('popstate', checkPath);
-      window.removeEventListener('hashchange', checkPath);
-    };
-  }, []);
 
   const handleSelectConversation = async (id: string) => {
     setActiveConversationId(id);
@@ -141,7 +117,6 @@ const App: React.FC = () => {
       if (e.key === 'Escape') {
         setStatus(GenerationStatus.IDLE);
         setErrorModalInfo(null);
-        if (view === 'debug') setView('chat');
       }
     };
     window.addEventListener('keydown', handleGlobalEsc);
@@ -204,9 +179,7 @@ const App: React.FC = () => {
       }
 
       // 4. CALL AI
-      setLastPayload({ prompt: prompt_text, images_count: images_ref.length, options: options_req, conversationId: currentConvId });
       const result = await generateCreative(prompt_text, images_ref, { ...options_req, conversationId: currentConvId, userId }, (p) => setProgress(p));
-      setLastResponse(result);
 
       // 5. PROCESS AI RESPONSE
       const processedResult = { ...result };
@@ -244,8 +217,7 @@ const App: React.FC = () => {
       }
     } catch (error: any) {
       console.error("ERRO GERAÇÃO:", error);
-      setLastResponse({ ok: false, error: error.message });
-      setStatus(GenerationStatus.ERROR);
+      setStatus(GenerationStatus.IDLE);
       setErrorModalInfo({ title: "Erro na Geração", message: "A IA encontrou um problema ao processar seu pedido.", details: error.message });
     } finally {
       clearTimeout(panicTimer);
@@ -298,27 +270,8 @@ const App: React.FC = () => {
             <h1 className="text-sm font-black text-op7-navy uppercase tracking-tighter">
               OP7 <span className="text-op7-blue">IA</span> Designer
             </h1>
-            {isSafeMode && (
-              <div className="flex items-center gap-1.5 bg-yellow-400/10 border border-yellow-400/20 px-2.5 py-1 rounded-full text-yellow-600">
-                <ShieldCheck size={10} />
-                <span className="text-[9px] font-black uppercase tracking-widest">Safe Mode ON</span>
-              </div>
-            )}
           </div>
-
           <div className="flex items-center gap-3">
-            <button onClick={() => setView('debug')} className="p-2 text-slate-300 hover:text-op7-blue transition-colors" title="Console de Debug">
-              <Terminal size={18} />
-            </button>
-
-            <button
-              onClick={() => setIsDiagnosticsOpen(true)}
-              className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-full transition-all group"
-            >
-              <Activity size={14} className="text-op7-blue group-hover:animate-pulse" />
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Saúde</span>
-            </button>
-
             {view === 'editor' && (
               <button onClick={() => setView('chat')} className="text-[10px] font-black uppercase tracking-widest text-op7-blue bg-op7-blue/5 px-4 py-2 rounded-full hover:bg-op7-blue hover:text-white transition-all shadow-sm">
                 ← Voltar ao Chat
@@ -364,7 +317,7 @@ const App: React.FC = () => {
                 />
               </div>
             </div>
-          ) : view === 'editor' ? (
+          ) : (
             <div className="flex-1 h-full overflow-hidden">
               <CanvasEditor
                 config={config}
@@ -378,19 +331,11 @@ const App: React.FC = () => {
                 canRedo={historyIndex < history.length - 1}
               />
             </div>
-          ) : (
-            <DebugPage
-              lastPayload={lastPayload}
-              lastResponse={lastResponse}
-              onClose={() => setView('chat')}
-            />
           )}
         </main>
       </div>
 
       {/* Overlays */}
-      <Diagnostics isOpen={isDiagnosticsOpen} onClose={() => setIsDiagnosticsOpen(false)} />
-
       {errorModalInfo && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-op7-navy/40 backdrop-blur-md p-4 animate-in fade-in duration-300">
           <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-white border-b-4 border-b-red-500">
