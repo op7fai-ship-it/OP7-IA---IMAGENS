@@ -5,10 +5,10 @@ export const runtime = 'nodejs';
 export default async function handler(req: any, res: any) {
     res.setHeader('Content-Type', 'application/json');
 
-    const { method } = req;
-    const { conversationId, messageId } = req.query;
-
     try {
+        const { method } = req;
+        const { conversationId, messageId } = req.query;
+
         switch (method) {
             case 'GET':
                 // Load messages for a specific conversation
@@ -65,7 +65,7 @@ export default async function handler(req: any, res: any) {
         if (error.code === 'PGRST116') {
             return res.status(404).json({ ok: false, error: 'Not found' });
         }
-        console.error(`❌ [BACKEND ERROR] /api/messages [${method}]:`, error);
-        return res.status(500).json({ ok: false, error: error.message || 'Internal Server Error' });
+        console.error(`❌ [BACKEND ERROR] /api/messages:`, error);
+        return res.status(500).json({ ok: false, error: error.message || 'Erro interno no servidor' });
     }
 }
