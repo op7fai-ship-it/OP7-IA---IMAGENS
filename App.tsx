@@ -4,9 +4,10 @@ import { CanvasEditor } from './components/CanvasEditor';
 import { Sidebar, Conversation } from './components/Sidebar';
 import { ChatStream } from './components/ChatStream';
 import { Diagnostics } from './components/Diagnostics';
+import { DebugPage } from './components/DebugPage';
 import { DesignConfig, GenerationStatus, GenerationOptions, GenerationProgress, ProjectVersion } from './types';
 import { generateCreative, regenerateLayer } from './services/geminiService';
-import { Sparkles, MessageSquare, ChevronRight, Activity, ShieldCheck } from 'lucide-react';
+import { Sparkles, MessageSquare, ChevronRight, Activity, ShieldCheck, Terminal } from 'lucide-react';
 
 const INITIAL_CONFIG: DesignConfig = {
   size: '1080x1350',
@@ -28,13 +29,17 @@ const getUserId = () => {
 
 const App: React.FC = () => {
   const [userId] = useState(getUserId());
-  const [view, setView] = useState<'chat' | 'editor'>('chat');
+  const [view, setView] = useState<'chat' | 'editor' | 'debug'>('chat');
   const [config, setConfig] = useState<DesignConfig>(INITIAL_CONFIG);
   const [status, setStatus] = useState<GenerationStatus>(GenerationStatus.IDLE);
   const [progress, setProgress] = useState<GenerationProgress>({ step: 'Aguardando prompt...', percentage: 0 });
   const [lastPrompt, setLastPrompt] = useState('');
   const [isDiagnosticsOpen, setIsDiagnosticsOpen] = useState(false);
   const [isSafeMode, setIsSafeMode] = useState(true);
+
+  // Debug Data
+  const [lastPayload, setLastPayload] = useState<any>(null);
+  const [lastResponse, setLastResponse] = useState<any>(null);
 
   // Sidebar Logic
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -50,13 +55,20 @@ const App: React.FC = () => {
   // Persistence for references
   const [references, setReferences] = useState<string[]>([]);
 
-  const fetchConversations = useCallback(async () => {
+  // REHYDRATION (F5) & Initial Load
+  const fetchConversations = useCallback(async (rehydrateId?: string | null) => {
     try {
       const res = await fetch(`/api/conversations?userId=${userId}`);
       if (!res.ok) return;
       const json = await res.json();
       if (json.ok && json.data) {
         setConversations(json.data);
+
+        // If we have a saved ID, rehydrate it
+        const targetId = rehydrateId || localStorage.getItem('op7_active_conv');
+        if (targetId && json.data.some((c: any) => c.id === targetId)) {
+          handleSelectConversation(targetId);
+        }
       }
     } catch (err) {
       console.warn("Conversations API não disponível.", err);
@@ -67,8 +79,25 @@ const App: React.FC = () => {
     fetchConversations();
   }, [fetchConversations]);
 
+  // Handle URL Routing / Hash
+  useEffect(() => {
+    const checkPath = () => {
+      if (window.location.pathname === '/debug' || window.location.hash === '#debug') {
+        setView('debug');
+      }
+    };
+    checkPath();
+    window.addEventListener('popstate', checkPath);
+    window.addEventListener('hashchange', checkPath);
+    return () => {
+      window.removeEventListener('popstate', checkPath);
+      window.removeEventListener('hashchange', checkPath);
+    };
+  }, []);
+
   const handleSelectConversation = async (id: string) => {
     setActiveConversationId(id);
+    localStorage.setItem('op7_active_conv', id);
     setView('chat');
     try {
       const res = await fetch(`/api/messages?conversationId=${id}`);
@@ -95,6 +124,7 @@ const App: React.FC = () => {
 
   const handleNewConversation = () => {
     setActiveConversationId(null);
+    localStorage.removeItem('op7_active_conv');
     setConfig(INITIAL_CONFIG);
     setView('chat');
     setLastPrompt('');
@@ -105,17 +135,18 @@ const App: React.FC = () => {
     setReferences([]);
   };
 
-  // PANIC UNLOCK: Reset status if stuck
+  // PANIC UNLOCK & GLOBAL ESC
   useEffect(() => {
     const handleGlobalEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setStatus(GenerationStatus.IDLE);
         setErrorModalInfo(null);
+        if (view === 'debug') setView('chat');
       }
     };
     window.addEventListener('keydown', handleGlobalEsc);
     return () => window.removeEventListener('keydown', handleGlobalEsc);
-  }, []);
+  }, [view]);
 
   const handleGenerate = async (prompt_text: string, images_ref: string[], options_req: GenerationOptions) => {
     // SECURITY: Panic Unlock Backup
@@ -124,38 +155,39 @@ const App: React.FC = () => {
         console.warn("⚠️ PANIC UNLOCK: Geração demorou demais, destravando UI...");
         setStatus(GenerationStatus.IDLE);
       }
-    }, 45000); // 45s safety
+    }, 55000);
 
     setStatus(GenerationStatus.INTERPRETING);
     setLastPrompt(prompt_text);
     setReferences(images_ref);
 
-    const tempUserMsg = { id: Date.now().toString(), role: 'user', content: { text: prompt_text, references: images_ref } };
+    // 1. Instantly Update UI
+    const tempUserMsg = { id: `temp-${Date.now()}`, role: 'user', content: { text: prompt_text, references: images_ref } };
     setMessages(prev => [...prev, tempUserMsg]);
 
     try {
       let currentConvId = activeConversationId;
+
+      // 2. Ensure Conversation Exists
       if (!currentConvId) {
         try {
-          const autoTitle = prompt_text.split(' ').slice(0, 5).join(' ').replace(/[#@*]/g, '') + (prompt_text.split(' ').length > 5 ? '...' : '');
+          const autoTitle = prompt_text.split(' ').slice(0, 6).join(' ').replace(/[#@*]/g, '') + (prompt_text.split(' ').length > 6 ? '...' : '');
           const res = await fetch('/api/conversations', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ user_id: userId, prompt: prompt_text, title: autoTitle })
           });
-          if (res.ok) {
-            const json = await res.json();
-            if (json.ok) {
-              currentConvId = json.data.id;
-              setActiveConversationId(currentConvId);
-              fetchConversations();
-            }
+          const json = await res.json();
+          if (json.ok) {
+            currentConvId = json.data.id;
+            setActiveConversationId(currentConvId);
+            localStorage.setItem('op7_active_conv', currentConvId);
+            fetchConversations(currentConvId); // Refresh sidebar immediately
           }
         } catch (convErr) { console.warn("Conversations API Falhou:", convErr); }
       }
 
-      const result = await generateCreative(prompt_text, images_ref, { ...options_req, conversationId: currentConvId, userId }, (p) => setProgress(p));
-
+      // 3. Save USER message to DB BEFORE calling AI (Persistence guarantee)
       if (currentConvId) {
         try {
           await fetch('/api/messages', {
@@ -168,9 +200,15 @@ const App: React.FC = () => {
               content: { text: prompt_text, references: images_ref }
             })
           });
-        } catch (dbSaveErr) { console.warn("Falha ao salvar msg:", dbSaveErr); }
+        } catch (dbSaveErr) { console.warn("Falha ao salvar msg do usuario:", dbSaveErr); }
       }
 
+      // 4. CALL AI
+      setLastPayload({ prompt: prompt_text, images_count: images_ref.length, options: options_req, conversationId: currentConvId });
+      const result = await generateCreative(prompt_text, images_ref, { ...options_req, conversationId: currentConvId, userId }, (p) => setProgress(p));
+      setLastResponse(result);
+
+      // 5. PROCESS AI RESPONSE
       const processedResult = { ...result };
       if (processedResult.data?.image?.kind === 'base64') {
         try {
@@ -187,12 +225,13 @@ const App: React.FC = () => {
         } catch (err) { console.error("Erro base64:", err); }
       }
 
+      // Update UI with real AI message
       const assistantMsg = {
         id: result.messageId || `asst-${Date.now()}`,
         role: 'assistant',
         content: processedResult.config ? processedResult : { ...processedResult, config: processedResult.config || INITIAL_CONFIG }
       };
-      setMessages(prev => [...prev, assistantMsg]);
+      setMessages(prev => [...prev.filter(m => !m.id.toString().startsWith('temp-')), assistantMsg]);
 
       if (processedResult.config) {
         const generationId = result.messageId || Date.now().toString();
@@ -200,14 +239,14 @@ const App: React.FC = () => {
         setConfig(processedResult.config);
         setHistory(prev => [...prev.slice(0, historyIndex + 1), processedResult.config]);
         setHistoryIndex(prev => prev + 1);
-        setVersions(prev => [...prev, { id: `v${prev.length + 1}`, timestamp: Date.now(), config: processedResult.config }]);
         setStatus(GenerationStatus.SUCCESS);
         setTimeout(() => setView('editor'), 800);
       }
     } catch (error: any) {
       console.error("ERRO GERAÇÃO:", error);
+      setLastResponse({ ok: false, error: error.message });
       setStatus(GenerationStatus.ERROR);
-      setErrorModalInfo({ title: "Erro na IA", message: "Não foi possível gerar no momento.", details: error.message });
+      setErrorModalInfo({ title: "Erro na Geração", message: "A IA encontrou um problema ao processar seu pedido.", details: error.message });
     } finally {
       clearTimeout(panicTimer);
     }
@@ -268,10 +307,13 @@ const App: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-3">
+            <button onClick={() => setView('debug')} className="p-2 text-slate-300 hover:text-op7-blue transition-colors" title="Console de Debug">
+              <Terminal size={18} />
+            </button>
+
             <button
               onClick={() => setIsDiagnosticsOpen(true)}
               className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-full transition-all group"
-              title="Status do Sistema"
             >
               <Activity size={14} className="text-op7-blue group-hover:animate-pulse" />
               <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Saúde</span>
@@ -287,10 +329,10 @@ const App: React.FC = () => {
 
         <main className="flex-1 relative flex flex-col min-h-0 overflow-hidden">
           {view === 'chat' ? (
-            <div className="flex-1 flex flex-col min-h-0 h-full">
-              <div className="flex-1 overflow-hidden flex flex-col h-full">
+            <div className="flex-1 flex flex-col min-h-0">
+              <div className="flex-1 overflow-hidden">
                 {messages.length === 0 ? (
-                  <div className="flex-1 flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-1000">
+                  <div className="h-full flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-1000">
                     <div className="w-16 h-16 bg-op7-navy rounded-[22px] flex items-center justify-center text-white mb-6 shadow-2xl shadow-op7-navy/20">
                       <Sparkles size={32} />
                     </div>
@@ -322,7 +364,7 @@ const App: React.FC = () => {
                 />
               </div>
             </div>
-          ) : (
+          ) : view === 'editor' ? (
             <div className="flex-1 h-full overflow-hidden">
               <CanvasEditor
                 config={config}
@@ -336,6 +378,12 @@ const App: React.FC = () => {
                 canRedo={historyIndex < history.length - 1}
               />
             </div>
+          ) : (
+            <DebugPage
+              lastPayload={lastPayload}
+              lastResponse={lastResponse}
+              onClose={() => setView('chat')}
+            />
           )}
         </main>
       </div>

@@ -13,29 +13,38 @@ export default async function handler(req: any, res: any) {
     }
 
     let dbConnected = false;
-    let envConfigured = false;
-    let geminiConfigured = false;
+    const missingEnvs: string[] = [];
 
-    // Check Env
-    try {
-        envConfigured = !!(process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY);
-        geminiConfigured = !!(process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY);
-    } catch (e) { }
+    // Check Gemini
+    const geminiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+    if (!geminiKey) missingEnvs.push("GEMINI_API_KEY (ou VITE_ / NEXT_PUBLIC_)");
 
-    // Check DB
+    // Check Supabase Envs
+    const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+    if (!sbUrl) missingEnvs.push("NEXT_PUBLIC_SUPABASE_URL");
+
+    const sbKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+    if (!sbKey) missingEnvs.push("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+
+    // Check real DB connection
     try {
         const { data, error } = await supabase.from('conversations').select('id').limit(1);
-        if (!error) dbConnected = true;
+        if (!error) {
+            dbConnected = true;
+        } else {
+            console.error("DB Health Check details:", error);
+        }
     } catch (e) {
         dbConnected = false;
     }
 
     return res.status(200).json({
         ok: true,
-        envConfigured,
-        geminiConfigured,
+        envConfigured: missingEnvs.length === 0,
+        missingEnvs: missingEnvs,
+        geminiConfigured: !!geminiKey,
         dbConnected,
-        timestamp: new Date().toISOString(),
+        timestamp: Date.now(), // Usando timestamp numérico para evitar Invalid Date no client
         node_version: process.version
     });
 }
