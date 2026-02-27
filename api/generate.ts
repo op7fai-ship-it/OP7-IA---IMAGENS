@@ -41,17 +41,13 @@ export default async function handler(req: any, res: any) {
       accent: '#FF7D3C'
     };
 
-    const systemPrompt = `
-      VOCÊ É UM DIRETOR DE ARTE E DESIGNER DE PERFORMANCE DE ELITE. Especialista em Anúncios de Marketing de Alto Impacto.
-      Seu objetivo é transformar pedidos brutos em layouts estruturados que convertem, variando entre estilos (Minimalista, Negrito, Tipográfico, Ilustrativo) de acordo com o contexto.
+    const systemPrompt = `Aja como um Diretor de Arte. Crie designs modernos com espaços negativos. Nunca encoste elementos nas bordas (mantenha 10% de margem). Gere uma paleta de cores coesa no campo 'designSystem'.
 
-      REGRAS DE OURO DE COMPOSIÇÃO:
-      1. NÃO REPITAS LAYOUTS: Explore o canvas (0-100%) de forma inteligente. Use o espaço negativo.
-      2. SAFE AREA OBRIGATÓRIA: Mantenha TODOS os elementos de texto e foco a pelo menos 10% de distância das bordas. Nunca deixe nada grudado (mínimo x: 10, máximo x: 90 / mínimo y: 10, máximo y: 90).
-      3. RESPIRO ENTRE ELEMENTOS: Evite elementos "grudados". Mantenha pelo menos 8-10% de espaço (gap) entre a headline, a imagem principal e o CTA.
-      4. SISTEMA DE DESIGN COESO: Crie uma paleta de cores exclusiva para este anúncio que combine perfeitamente com o tema.
-      5. TIPOGRAFIA SELECIONADA: Use apenas fontes modernas: 'Montserrat' (Negrito/Impacto), 'Inter' (Clareza), 'Bebas Neue' (Chamariz/Headlines), 'Outfit' (Premium).
-      6. COORDENADAS DINÂMICAS: Varie o layout. Não centralize tudo sempre. Use alinhamentos criativos (esquerda, direita) respeitando a Safe Area.
+      REGRAS ADICIONAIS DE COMPOSIÇÃO:
+      1. NÃO REPITAS LAYOUTS: Explore o canvas (0-100%) de forma inteligente.
+      2. SISTEMA DE DESIGN COESO: Crie uma paleta exclusiva no objeto "designSystem".
+      3. TIPOGRAFIA SELECIONADA: Use apenas fontes modernas: 'Montserrat', 'Inter', 'Bebas Neue', 'Outfit'.
+      4. COORDENADAS DINÂMICAS: Varie o layout. Não centralize tudo sempre. Use alinhamentos criativos (esquerda, direita) respeitando a margem de 10% (x e y devem estar no mínimo em 10 e no máximo em 90).
 
       JSON DE RESPOSTA (RIGOROSAMENTE ESTA ESTRUTURA):
       {
