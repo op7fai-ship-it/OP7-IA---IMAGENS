@@ -5,10 +5,10 @@ export const runtime = 'nodejs';
 export default async function handler(req: any, res: any) {
     res.setHeader('Content-Type', 'application/json');
 
-    const { method } = req;
-    const { id, userId } = req.query;
-
     try {
+        const { method } = req;
+        const { id, userId } = req.query;
+
         switch (method) {
             case 'GET':
                 if (id) {
@@ -73,7 +73,7 @@ export default async function handler(req: any, res: any) {
                 // Rename conversation
                 if (!id) return res.status(400).json({ ok: false, error: 'Missing conversation id' });
 
-                const { title: newTitle } = req.body;
+                const { title: newTitle, userId: patchUserId } = req.body;
                 if (!newTitle) return res.status(400).json({ ok: false, error: 'Missing new title' });
 
                 const { data: updatedConv, error: updateError } = await supabase
@@ -103,7 +103,7 @@ export default async function handler(req: any, res: any) {
                 return res.status(405).json({ ok: false, error: `Method ${method} Not Allowed` });
         }
     } catch (error: any) {
-        console.error(`❌ [BACKEND ERROR] /api/conversations [${method}]:`, error);
-        return res.status(500).json({ ok: false, error: error.message || 'Internal Server Error' });
+        console.error(`❌ [BACKEND ERROR] /api/conversations:`, error);
+        return res.status(500).json({ ok: false, error: error.message || 'Erro interno no servidor' });
     }
 }

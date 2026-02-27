@@ -225,6 +225,6 @@ export default async function handler(req: any, res: any) {
 
   } catch (globalError: any) {
     console.error("💥 [BACKEND CRITICAL]:", globalError);
-    return res.status(500).json(toErrorResponse("INTERNAL_SERVER_ERROR", "Erro interno no backend.", globalError.message));
+    return res.status(500).json({ ok: false, error: globalError.message || 'Erro interno no servidor' });
   }
 }

@@ -80,8 +80,8 @@ const App: React.FC = () => {
     try {
       const res = await fetch(`/api/messages?conversationId=${id}&userId=${userId}`);
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || `Erro HTTP ${res.status}`);
+        const errorRaw = await res.text();
+        throw new Error(errorRaw || `Erro HTTP ${res.status}`);
       }
       const json = await res.json();
       if (json.ok && json.data) {
@@ -98,8 +98,9 @@ const App: React.FC = () => {
           setReferences([]);
         }
       }
-    } catch (err) {
-      console.warn("Messages API não disponível.", err);
+    } catch (err: any) {
+      console.warn("Messages API Fail:", err);
+      setErrorModalInfo({ title: "Erro de Sincronização", message: "Não foi possível carregar o histórico.", details: err.message });
     }
   };
 
@@ -157,6 +158,10 @@ const App: React.FC = () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ user_id: userId, prompt: prompt_text, title: autoTitle })
           });
+          if (!res.ok) {
+            const errRaw = await res.text();
+            throw new Error(`Conversations create fail: ${errRaw}`);
+          }
           const json = await res.json();
           if (json.ok) {
             currentConvId = json.data.id;
@@ -170,7 +175,7 @@ const App: React.FC = () => {
       // 3. Save USER message to DB BEFORE calling AI (Persistence guarantee)
       if (currentConvId) {
         try {
-          await fetch('/api/messages', {
+          const res = await fetch('/api/messages', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -180,6 +185,10 @@ const App: React.FC = () => {
               content: { text: prompt_text, references: images_ref }
             })
           });
+          if (!res.ok) {
+            const errRaw = await res.text();
+            throw new Error(`Message save fail: ${errRaw}`);
+          }
         } catch (dbSaveErr) { console.warn("Falha ao salvar msg do usuario:", dbSaveErr); }
       }
 
