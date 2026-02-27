@@ -13,10 +13,10 @@ const supabaseKey =
     process.env.SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseKey) {
-    console.warn("⚠️ [SUPABASE LIB] Credenciais ausentes. Verifique NEXT_PUBLIC_SUPABASE_URL e ANON_KEY.");
+    console.error("❌ [SUPABASE LIB] Credenciais CRÍTICAS ausentes. Configure SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY ou ANON_KEY.");
 }
 
 export const supabase = createClient(
-    supabaseUrl || 'https://placeholder.supabase.co',
-    supabaseKey || 'placeholder'
+    supabaseUrl || '',
+    supabaseKey || ''
 );
