@@ -188,19 +188,23 @@ const App: React.FC = () => {
 
       // 5. PROCESS AI RESPONSE
       const processedResult = { ...result };
-      if (processedResult.data?.image?.kind === 'base64') {
+      const apiImage = (processedResult as any).image;
+
+      if (apiImage?.kind === 'base64') {
         try {
           const { base64ToBlob } = await import('./lib/image');
-          const blob = base64ToBlob(processedResult.data.image.base64, processedResult.data.image.mimeType);
+          const blob = base64ToBlob(apiImage.base64, apiImage.mimeType);
           const objectUrl = URL.createObjectURL(blob);
-          processedResult.config.backgroundImage = objectUrl;
-          processedResult.imageUrl = objectUrl;
-          if (processedResult.config.layers) {
-            processedResult.config.layers = processedResult.config.layers.map((l: any) =>
-              l.type === 'image' ? { ...l, content: objectUrl } : l
-            );
+          if (processedResult.config) {
+            processedResult.config.backgroundImage = objectUrl;
+            if (processedResult.config.layers) {
+              processedResult.config.layers = processedResult.config.layers.map((l: any) =>
+                l.type === 'image' ? { ...l, content: objectUrl } : l
+              );
+            }
           }
-        } catch (err) { console.error("Erro base64:", err); }
+          processedResult.imageUrl = objectUrl;
+        } catch (err) { console.error("Erro base64 processing:", err); }
       }
 
       // Update UI with real AI message

@@ -50,7 +50,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
     const handleLayerAction = useCallback((id: string, action: 'visible' | 'locked') => {
         setConfig(prev => ({
             ...prev,
-            layers: prev.layers.map(l => {
+            layers: (prev?.layers || []).map(l => {
                 if (l.id !== id) return l;
                 if (action === 'visible') return { ...l, visible: l.visible === false };
                 return { ...l, locked: !l.locked };
@@ -114,19 +114,19 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
 
                 setConfig(prev => ({
                     ...prev,
-                    layers: prev.layers.map(l => l.id === draggingId ? { ...l, position: { x, y } } : l)
+                    layers: (prev?.layers || []).map(l => l.id === draggingId ? { ...l, position: { x, y } } : l)
                 }));
             }
 
             if (resizingId) {
-                const layer = config.layers.find(l => l.id === resizingId);
+                const layer = (config?.layers || []).find(l => l.id === resizingId);
                 if (!layer) return;
                 const rect = canvasRef.current.getBoundingClientRect();
                 const mouseX = ((e.clientX - rect.left) / rect.width) * 100;
-                const dist = Math.abs(mouseX - layer.position.x) * 2;
+                const dist = Math.abs(mouseX - (layer?.position?.x || 0)) * 2;
                 setConfig(prev => ({
                     ...prev,
-                    layers: prev.layers.map(l => l.id === resizingId ? {
+                    layers: (prev?.layers || []).map(l => l.id === resizingId ? {
                         ...l,
                         size: { ...(l?.size || {}), width: Math.max(5, dist) }
                     } : l)
@@ -459,7 +459,7 @@ const DiagnosticProps: React.FC<{ layer: Layer; setConfig: any; isBackground?: b
                 <div className="space-y-1.5">
                     <label className="text-[9px] font-bold text-slate-400 uppercase">Fundo do Canvas</label>
                     <div className="flex flex-wrap gap-2">
-                        {palette && Object.entries(palette).map(([name, hex]: [string, any]) => (
+                        {palette && typeof palette === 'object' && Object.entries(palette).map(([name, hex]: [string, any]) => (
                             <button
                                 key={name}
                                 onClick={() => setConfig((p: any) => ({ ...p, backgroundColor: hex }))}
@@ -553,7 +553,7 @@ const DiagnosticProps: React.FC<{ layer: Layer; setConfig: any; isBackground?: b
                                 <div className="space-y-1.5">
                                     <label className="text-[9px] font-bold text-slate-400 uppercase">Cor do Texto</label>
                                     <div className="flex flex-wrap gap-2">
-                                        {palette && Object.entries(palette).map(([name, hex]: [string, any]) => (
+                                        {palette && typeof palette === 'object' && Object.entries(palette).map(([name, hex]: [string, any]) => (
                                             <button
                                                 key={name}
                                                 onClick={() => updateStyle({ color: hex })}
@@ -574,7 +574,7 @@ const DiagnosticProps: React.FC<{ layer: Layer; setConfig: any; isBackground?: b
                                 <div className="space-y-1.5">
                                     <label className="text-[9px] font-bold text-slate-400 uppercase">Fundo do Botão</label>
                                     <div className="flex flex-wrap gap-2">
-                                        {palette && Object.entries(palette).map(([name, hex]: [string, any]) => (
+                                        {palette && typeof palette === 'object' && Object.entries(palette).map(([name, hex]: [string, any]) => (
                                             <button
                                                 key={name}
                                                 onClick={() => updateStyle({ backgroundColor: hex })}

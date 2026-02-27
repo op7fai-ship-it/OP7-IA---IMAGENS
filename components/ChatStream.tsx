@@ -49,7 +49,7 @@ export const ChatStream: React.FC<ChatStreamProps> = ({ messages, onOpenEditor, 
 
                                 {isUser ? (
                                     <div className="text-[15px] leading-relaxed break-words whitespace-pre-wrap font-medium">
-                                        {msg.content?.text || msg.content}
+                                        {typeof msg.content === 'object' ? msg.content?.text : (msg.content || '')}
                                     </div>
                                 ) : (
                                     <div className="space-y-5">
@@ -84,8 +84,8 @@ export const ChatStream: React.FC<ChatStreamProps> = ({ messages, onOpenEditor, 
 
                                                 {/* Debug instrumentation */}
                                                 <div className="mt-6 flex flex-wrap gap-3 opacity-20 hover:opacity-100 transition-opacity">
-                                                    <span className="text-[9px] font-mono text-slate-400">MSG_ID: {msg.id.substring(0, 8)}</span>
-                                                    {msg.content?.image && (
+                                                    <span className="text-[9px] font-mono text-slate-400">MSG_ID: {String(msg?.id || '').substring(0, 8)}</span>
+                                                    {msg?.content?.image && (
                                                         <span className="text-[9px] font-mono text-slate-400 uppercase">IMG: {msg.content.image.kind}</span>
                                                     )}
                                                 </div>
