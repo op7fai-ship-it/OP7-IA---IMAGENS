@@ -175,8 +175,8 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
                 <button onClick={onRedo} disabled={!canRedo} className={`p-3 rounded-xl transition-all ${canRedo ? 'text-slate-600 hover:bg-slate-50' : 'text-slate-200 cursor-not-allowed'}`}><Redo2 size={18} /></button>
             </div>
 
-            {/* Main Workspace */}
-            <div className="flex-1 relative flex flex-col items-center justify-center p-12 overflow-hidden bg-slate-50">
+            {/* Main Workspace (Figma Style) */}
+            <div className="flex-1 relative flex flex-col items-center justify-center p-20 overflow-hidden bg-slate-200/50">
 
                 {/* Status Badges */}
                 {showTooltip && (
@@ -282,7 +282,8 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
                                                     textTransform: (layer?.style?.textTransform || 'none') as any,
                                                     lineHeight: layer?.style?.lineHeight || '1.1',
                                                     letterSpacing: layer?.style?.letterSpacing || 'normal',
-                                                    transform: `rotate(${layer?.style?.rotate || 0}deg)`
+                                                    transform: `rotate(${layer?.style?.rotate || 0}deg)`,
+                                                    opacity: layer?.style?.opacity ?? 1
                                                 }}
                                             >
                                                 {layer?.content || ''}
@@ -303,6 +304,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
                                                     letterSpacing: layer?.style?.letterSpacing || '0.05em',
                                                     textTransform: (layer?.style?.textTransform || 'uppercase') as any,
                                                     transform: `rotate(${layer?.style?.rotate || 0}deg)`,
+                                                    opacity: layer?.style?.opacity ?? 1,
                                                     border: 'none',
                                                     cursor: isEditing ? 'text' : 'pointer'
                                                 }}
@@ -326,7 +328,15 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
                                         )}
 
                                         {layer?.type === 'image' && (
-                                            <img src={layer?.content || ''} className="w-full h-auto pointer-events-none transition-transform duration-500" />
+                                            <img
+                                                src={layer?.content || ''}
+                                                className="w-full h-auto pointer-events-none transition-transform duration-500"
+                                                style={{
+                                                    borderRadius: `${layer?.style?.borderRadius || 0}px`,
+                                                    opacity: layer?.style?.opacity ?? 1,
+                                                    transform: `rotate(${layer?.style?.rotate || 0}deg)`
+                                                }}
+                                            />
                                         )}
 
                                         {/* Resize & UI Indicators */}
@@ -417,10 +427,10 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
                         </div>
                     ) : selectedLayerId ? (
                         <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
-                            <DiagnosticProps 
-                                layer={config?.layers?.find(l => l.id === selectedLayerId) || (null as any)} 
-                                setConfig={setConfig} 
-                                isBackground={selectedLayerId === 'background'} 
+                            <DiagnosticProps
+                                layer={config?.layers?.find(l => l.id === selectedLayerId) || (null as any)}
+                                setConfig={setConfig}
+                                isBackground={selectedLayerId === 'background'}
                                 palette={config?.palette}
                             />
                         </div>
@@ -480,6 +490,7 @@ const DiagnosticProps: React.FC<{ layer: Layer; setConfig: any; isBackground?: b
 
     return (
         <div className="space-y-8">
+            {/* Transform Section */}
             <div className="space-y-3">
                 <h3 className="text-[10px] font-black text-op7-navy uppercase tracking-widest opacity-40">Transformar</h3>
                 <div className="grid grid-cols-2 gap-3">
@@ -491,31 +502,29 @@ const DiagnosticProps: React.FC<{ layer: Layer; setConfig: any; isBackground?: b
                         <label className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Posição Y</label>
                         <input type="number" value={Math.round(layer?.position?.y || 0)} onChange={(e) => setConfig((p: any) => ({ ...p, layers: p?.layers?.map((l: any) => l.id === layer?.id ? { ...l, position: { ...(l?.position || {}), y: parseInt(e.target.value) } } : l) }))} className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-xs font-black" />
                     </div>
-                    <div className="space-y-1.5">
+                    <div className="space-y-1.5 col-span-2">
                         <label className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Rotação</label>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-3">
                             <input type="range" min="-180" max="180" value={layer?.style?.rotate || 0} onChange={(e) => updateStyle({ rotate: parseInt(e.target.value) })} className="flex-1 accent-op7-blue" />
-                            <span className="text-[10px] font-black text-slate-400 w-8">{layer?.style?.rotate || 0}°</span>
+                            <span className="text-[10px] font-black text-slate-400 w-10 text-right">{layer?.style?.rotate || 0}°</span>
+                        </div>
+                    </div>
+                    <div className="space-y-1.5 col-span-2">
+                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Opacidade</label>
+                        <div className="flex items-center gap-3">
+                            <input type="range" min="0" max="1" step="0.1" value={layer?.style?.opacity ?? 1} onChange={(e) => updateStyle({ opacity: parseFloat(e.target.value) })} className="flex-1 accent-op7-blue" />
+                            <span className="text-[10px] font-black text-slate-400 w-10 text-right">{Math.round((layer?.style?.opacity ?? 1) * 100)}%</span>
                         </div>
                     </div>
                 </div>
             </div>
 
+            {/* Appearance Section */}
             <div className="space-y-6">
                 <div className="space-y-3">
-                    <h3 className="text-[10px] font-black text-op7-navy uppercase tracking-widest opacity-40">Conteúdo & Estilo</h3>
+                    <h3 className="text-[10px] font-black text-op7-navy uppercase tracking-widest opacity-40">Aparência & Estilo</h3>
                     <div className="space-y-4">
-                        {(layer?.type === 'text' || layer?.type === 'button') && (
-                            <div className="space-y-1.5">
-                                <label className="text-[9px] font-bold text-slate-400 uppercase">Texto</label>
-                                <textarea
-                                    value={layer?.content || ''}
-                                    onChange={(e) => setConfig((p: any) => ({ ...p, layers: p.layers.map((l: any) => l.id === layer?.id ? { ...l, content: e.target.value } : l) }))}
-                                    className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-medium min-h-[60px] resize-none focus:bg-white focus:ring-2 focus:ring-op7-blue/10 transition-all outline-none"
-                                />
-                            </div>
-                        )}
-
+                        {/* Text Controls */}
                         {(layer?.type === 'text' || layer?.type === 'button') && (
                             <>
                                 <div className="space-y-1.5">
@@ -550,6 +559,7 @@ const DiagnosticProps: React.FC<{ layer: Layer; setConfig: any; isBackground?: b
                                                 onClick={() => updateStyle({ color: hex })}
                                                 className={`w-6 h-6 rounded-md border border-slate-200 transition-transform hover:scale-110 ${layer?.style?.color === hex ? 'ring-2 ring-op7-blue ring-offset-1' : ''}`}
                                                 style={{ backgroundColor: hex }}
+                                                title={name}
                                             />
                                         ))}
                                         <input type="color" value={layer?.style?.color || '#000000'} onChange={(e) => updateStyle({ color: e.target.value })} className="w-6 h-6 rounded-md border border-slate-200 cursor-pointer" />
@@ -558,6 +568,7 @@ const DiagnosticProps: React.FC<{ layer: Layer; setConfig: any; isBackground?: b
                             </>
                         )}
 
+                        {/* Button Specifics */}
                         {layer?.type === 'button' && (
                             <>
                                 <div className="space-y-1.5">
@@ -569,16 +580,21 @@ const DiagnosticProps: React.FC<{ layer: Layer; setConfig: any; isBackground?: b
                                                 onClick={() => updateStyle({ backgroundColor: hex })}
                                                 className={`w-6 h-6 rounded-md border border-slate-200 transition-transform hover:scale-110 ${layer?.style?.backgroundColor === hex ? 'ring-2 ring-op7-blue ring-offset-1' : ''}`}
                                                 style={{ backgroundColor: hex }}
+                                                title={name}
                                             />
                                         ))}
                                         <input type="color" value={layer?.style?.backgroundColor || '#000000'} onChange={(e) => updateStyle({ backgroundColor: e.target.value })} className="w-6 h-6 rounded-md border border-slate-200 cursor-pointer" />
                                     </div>
                                 </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-[9px] font-bold text-slate-400 uppercase">Arredondamento: {layer?.style?.borderRadius || 0}px</label>
-                                    <input type="range" min="0" max="100" value={layer?.style?.borderRadius || 0} onChange={(e) => updateStyle({ borderRadius: parseInt(e.target.value) })} className="w-full accent-op7-blue" />
-                                </div>
                             </>
+                        )}
+
+                        {/* Common Style Controls (Corner Radius) */}
+                        {(layer?.type === 'button' || layer?.type === 'image') && (
+                            <div className="space-y-1.5">
+                                <label className="text-[9px] font-bold text-slate-400 uppercase">Arredondamento: {layer?.style?.borderRadius || 0}px</label>
+                                <input type="range" min="0" max="100" value={layer?.style?.borderRadius || 0} onChange={(e) => updateStyle({ borderRadius: parseInt(e.target.value) })} className="w-full accent-op7-blue" />
+                            </div>
                         )}
                     </div>
                 </div>

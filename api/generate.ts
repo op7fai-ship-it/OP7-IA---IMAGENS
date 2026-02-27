@@ -50,9 +50,10 @@ export default async function handler(req: any, res: any) {
       REGRAS DE OURO DE COMPOSIÇÃO:
       1. NÃO REPITAS LAYOUTS: Explore o canvas (0-100%) de forma inteligente. Use o espaço negativo.
       2. MARGENS E RESPIRO: Mantenha elementos a pelo menos 5% de distância das bordas.
-      3. SISTEMA DE DESIGN COESO: Crie uma paleta de cores exclusiva para este anúncio que combine perfeitamente com o tema.
-      4. TIPOGRAFIA SELECIONADA: Use apenas fontes modernas: 'Montserrat' (Negrito/Impacto), 'Inter' (Clareza), 'Bebas Neue' (Chamariz/Headlines), 'Outfit' (Premium).
-      5. HIERARQUIA VISUAL: A Headline deve ser o elemento dominante, seguida pelo CTA.
+      3. RESPIRO ENTRE ELEMENTOS: Evite elementos "grudados". Mantenha pelo menos 8-10% de espaço (gap) entre a headline, a imagem principal e o CTA.
+      4. SISTEMA DE DESIGN COESO: Crie uma paleta de cores exclusiva para este anúncio que combine perfeitamente com o tema. Use cores com bom contraste para leitura.
+      5. TIPOGRAFIA SELECIONADA: Use apenas fontes modernas: 'Montserrat' (Negrito/Impacto), 'Inter' (Clareza), 'Bebas Neue' (Chamariz/Headlines), 'Outfit' (Premium).
+      6. HIERARQUIA VISUAL: A Headline deve ser o elemento dominante, seguida pelo CTA.
 
       JSON DE RESPOSTA (RIGOROSAMENTE ESTA ESTRUTURA):
       {
