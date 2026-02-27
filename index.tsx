@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
-// Styles moved to index.html to prevent 404s
+import './index.css';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
