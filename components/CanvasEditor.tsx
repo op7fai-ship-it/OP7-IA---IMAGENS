@@ -312,9 +312,92 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
 
                 <div className="flex-1 overflow-auto p-6 space-y-8">
                     {!selectedLayer ? (
-                        <div className="h-full flex flex-col items-center justify-center text-slate-300 gap-4 text-center">
-                            <MousePointer2 size={40} className="opacity-20" />
-                            <p className="text-sm font-medium">Selecione um elemento para editar suas propriedades</p>
+                        <div className="space-y-6">
+                            <div className="flex flex-col items-center justify-center text-slate-400 gap-2 mb-8 text-center bg-slate-50 p-4 rounded-xl border border-slate-100">
+                                <MousePointer2 size={24} className="opacity-50" />
+                                <p className="text-xs font-semibold">Clique num elemento para editá-lo</p>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-[10px] font-black text-op7-navy uppercase tracking-[0.2em]">Paleta Global</h3>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const defaultPalette = {
+                                                primary: '#002B5B',
+                                                secondary: '#1A73E8',
+                                                background: '#F8FAFC',
+                                                text: '#002B5B',
+                                                accent: '#FF7D3C',
+                                                gradientEnabled: false,
+                                                gradientStart: '#002B5B',
+                                                gradientEnd: '#1A73E8',
+                                            };
+                                            setConfig(prev => ({ ...prev, palette: defaultPalette }));
+                                        }}
+                                        className="text-[10px] font-bold text-op7-blue hover:underline"
+                                    >
+                                        Reset OP7
+                                    </button>
+                                </div>
+                                <div className="space-y-3">
+                                    {(['primary', 'secondary', 'background', 'text', 'accent'] as const).map(colorKey => (
+                                        <div key={colorKey} className="flex items-center justify-between gap-3">
+                                            <span className="text-[10px] font-bold text-slate-500 uppercase flex-1">{colorKey}</span>
+                                            <div className="flex items-center overflow-hidden rounded-lg border border-op7-border bg-white w-32">
+                                                <input
+                                                    type="color"
+                                                    value={config.palette?.[colorKey] || '#000000'}
+                                                    onChange={e => setConfig(prev => ({
+                                                        ...prev,
+                                                        palette: {
+                                                            ...(prev.palette || {
+                                                                primary: '#002B5B', secondary: '#1A73E8', background: '#F8FAFC', text: '#002B5B', accent: '#FF7D3C', gradientEnabled: false, gradientStart: '#002B5B', gradientEnd: '#1A73E8'
+                                                            }),
+                                                            [colorKey]: e.target.value
+                                                        }
+                                                    }))}
+                                                    className="w-6 h-6 p-0 border-0 rounded-none cursor-pointer shrink-0"
+                                                />
+                                                <input
+                                                    type="text"
+                                                    value={config.palette?.[colorKey] || '#000000'}
+                                                    onChange={e => setConfig(prev => ({
+                                                        ...prev,
+                                                        palette: {
+                                                            ...(prev.palette || {
+                                                                primary: '#002B5B', secondary: '#1A73E8', background: '#F8FAFC', text: '#002B5B', accent: '#FF7D3C', gradientEnabled: false, gradientStart: '#002B5B', gradientEnd: '#1A73E8'
+                                                            }),
+                                                            [colorKey]: e.target.value
+                                                        }
+                                                    }))}
+                                                    className="w-full text-xs font-medium px-2 py-1 outline-none uppercase"
+                                                />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={() => {
+                                    if (!config.palette) return;
+                                    setConfig(prev => ({
+                                        ...prev,
+                                        backgroundColor: config.palette!.background,
+                                        layers: prev.layers.map(l => {
+                                            if (l.id === 'headline') return { ...l, style: { ...l.style, color: config.palette!.text } };
+                                            if (l.id === 'subheadline') return { ...l, style: { ...l.style, color: config.palette!.secondary } };
+                                            if (l.type === 'button') return { ...l, style: { ...l.style, backgroundColor: config.palette!.accent, color: '#FFFFFF' } };
+                                            return l;
+                                        })
+                                    }));
+                                }}
+                                className="w-full py-3 bg-op7-blue/10 text-op7-blue font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-op7-blue hover:text-white transition-all"
+                            >
+                                Aplicar no Criativo Inteiro
+                            </button>
                         </div>
                     ) : (
                         <>

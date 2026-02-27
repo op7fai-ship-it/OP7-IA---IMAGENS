@@ -45,12 +45,24 @@ export interface Layer {
   locked: boolean;
 }
 
+export interface ColorPalette {
+  primary: string;
+  secondary: string;
+  background: string;
+  text: string;
+  accent: string;
+  gradientEnabled: boolean;
+  gradientStart: string;
+  gradientEnd: string;
+}
+
 export interface DesignConfig {
   size: AdSize;
   backgroundColor: string;
   backgroundImage: string | null;
   overlayOpacity: number;
   overlayColor: string;
+  palette?: ColorPalette; // Added palette to the saved config state
   layers: Layer[];
 }
 
@@ -62,11 +74,19 @@ export interface ChatMessage {
   timestamp: number;
 }
 
+export interface ImageReference {
+  name: string;
+  type: string;
+  data: string; // base64
+}
+
 export interface GenerationOptions {
   format?: AdSize;
   language?: string;
   tone?: ToneType;
   backgroundStyle?: BackgroundStyle;
+  palette?: ColorPalette;
+  useReferences?: boolean;
 }
 
 export interface GenerationProgress {

@@ -56,8 +56,8 @@ const App: React.FC = () => {
 
   const handleRegenerate = async (target: 'all' | 'text' | 'art' | 'layout') => {
     if (target === 'all') {
-      // Redo the whole thing with same prompt
-      handleGenerate(lastPrompt, [], {}); // Simplified for now
+      // Redo the whole thing with same prompt, persisting user selected palette and size
+      handleGenerate(lastPrompt, [], { palette: config.palette, format: config.size });
       return;
     }
 

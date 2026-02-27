@@ -35,9 +35,24 @@ export default async function handler(req: any, res: any) {
 
   const genAI = new GoogleGenerativeAI(API_KEY);
 
+  const paletteObj = options?.palette || {
+    primary: '#002B5B',
+    secondary: '#1A73E8',
+    background: '#F8FAFC',
+    text: '#002B5B',
+    accent: '#FF7D3C'
+  };
+
   const systemPrompt = `
       Você é um Diretor de Arte e Copywriter Senior da OP7, especialista em tráfego pago de alta conversão.
       Objetivo: Criar um design de anúncio matador resolvendo o problema do usuário.
+
+      A PALETA DE CORES SOLICITADA É:
+      - Cor Primária: ${paletteObj.primary}
+      - Cor Secundária: ${paletteObj.secondary}
+      - Cor do Fundo: ${paletteObj.background}
+      - Cor do Texto Principal: ${paletteObj.text}
+      - Cor de Destaque/CTA: ${paletteObj.accent}
       
       RETORNE UM JSON NO SEGUINTE FORMATO:
       {
@@ -47,7 +62,7 @@ export default async function handler(req: any, res: any) {
         "backgroundPrompt": "Descrição detalhada do estilo visual do fundo",
         "config": {
           "size": "${format || options?.format || '1080x1350'}",
-          "backgroundColor": "#F8FAFC",
+          "backgroundColor": "${paletteObj.background}",
           "backgroundImage": "URL_PLACEHOLDER",
           "overlayOpacity": 0.2,
           "overlayColor": "#000000",
@@ -59,7 +74,7 @@ export default async function handler(req: any, res: any) {
               "content": "MESMA HEADLINE ACIMA",
               "position": {"x": 50, "y": 30},
               "size": {"width": 80, "height": 20},
-              "style": { "color": "#002B5B", "fontSize": 4.5, "fontWeight": "900", "fontFamily": "Montserrat", "textAlign": "center", "textTransform": "uppercase" }
+              "style": { "color": "${paletteObj.text}", "fontSize": 4.5, "fontWeight": "900", "fontFamily": "Montserrat", "textAlign": "center", "textTransform": "uppercase" }
             },
             {
               "id": "subheadline",
@@ -68,7 +83,7 @@ export default async function handler(req: any, res: any) {
               "content": "MESMA DESCRIPTION ACIMA",
               "position": {"x": 50, "y": 55},
               "size": {"width": 75, "height": 15},
-              "style": { "color": "#1A73E8", "fontSize": 2, "fontWeight": "600", "fontFamily": "Outfit", "textAlign": "center" }
+              "style": { "color": "${paletteObj.secondary}", "fontSize": 2, "fontWeight": "600", "fontFamily": "Outfit", "textAlign": "center" }
             },
             {
               "id": "cta",
@@ -77,21 +92,22 @@ export default async function handler(req: any, res: any) {
               "content": "MESMO CTA ACIMA",
               "position": {"x": 50, "y": 80},
               "size": {"width": 45, "height": 8},
-              "style": { "color": "#FFFFFF", "backgroundColor": "#FF7D3C", "fontSize": 1.5, "fontWeight": "900", "fontFamily": "Montserrat", "borderRadius": 50, "padding": 20 }
+              "style": { "color": "#FFFFFF", "backgroundColor": "${paletteObj.accent}", "fontSize": 1.5, "fontWeight": "900", "fontFamily": "Montserrat", "borderRadius": 50, "padding": 20 }
             }
           ]
         }
       }
 
-      ESTILO OP7:
-      - Azul Marinho (#002B5B), Azul Royal (#1A73E8), Laranja (#FF7D3C).
+      ESTILO:
+      - Siga as cores da paleta definida acima rigorosamente.
       - Fontes: Montserrat, Bebas Neue, Outfit.
       - Foco total em conversão.
+      ${options?.useReferences !== false && images && images.length > 0 ? "AS IMAGENS ANEXADAS SÃO APENAS REFERÊNCIAS. Extraia o estilo/tema visual ou produto (ex: 'clínica clean', 'tech neon', 'produto x') e crie um prompt de fundo e layout que remetam a esse estilo/produto, sem copiar." : ""}
   `;
 
   const parts: any[] = [{ text: systemPrompt }, { text: `USUÁRIO PEDIU: ${prompt}` }];
 
-  if (images && images.length > 0) {
+  if (options?.useReferences !== false && images && images.length > 0) {
     images.forEach((img: string) => {
       const match = img.match(/^data:(.*);base64,(.*)$/);
       if (match) {
@@ -104,7 +120,7 @@ export default async function handler(req: any, res: any) {
 
   for (const modelName of MODELS) {
     try {
-      console.log(`🤖 [BACKEND] Tentando modelo: ${modelName}`);
+      console.log(`🤖[BACKEND] Tentando modelo: ${modelName}`);
       const model = genAI.getGenerativeModel({
         model: modelName,
         generationConfig: { responseMimeType: "application/json" }
