@@ -155,7 +155,10 @@ const App: React.FC = () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ user_id: userId, prompt: prompt_text, title: autoTitle })
           });
-          if (!res.ok) { const errText = await res.text(); throw new Error(errText); }
+          if (!res.ok) {
+            const text = await res.text();
+            throw new Error("Erro do Servidor: " + text);
+          }
           const json = await res.json();
           if (json.ok) {
             currentConvId = json.data.id;
@@ -179,7 +182,10 @@ const App: React.FC = () => {
               content: { text: prompt_text, references: images_ref }
             })
           });
-          if (!res.ok) { const errText = await res.text(); throw new Error(errText); }
+          if (!res.ok) {
+            const text = await res.text();
+            throw new Error("Erro do Servidor: " + text);
+          }
         } catch (dbSaveErr) { console.warn("Falha ao salvar msg do usuario:", dbSaveErr); }
       }
 

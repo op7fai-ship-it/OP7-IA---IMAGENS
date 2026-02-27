@@ -104,6 +104,6 @@ export default async function handler(req: any, res: any) {
         }
     } catch (error: any) {
         console.error(`❌ [BACKEND ERROR] /api/conversations:`, error);
-        return res.status(500).json({ ok: false, error: error.message });
+        return res.status(500).json({ ok: false, error: error.message || 'Erro interno no servidor' });
     }
 }

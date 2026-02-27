@@ -45,11 +45,7 @@ export const generateCreative = async (
 
     if (!response.ok) {
       const errText = await response.text();
-      if (retries > 0) {
-        console.warn(`⚠️ Erro na API (${response.status}). Tentando novamente... Restam ${retries}`);
-        return generateCreative(prompt, images, options, onProgress, retries - 1);
-      }
-      throw new Error(errText || `Erro HTTP ${response.status}`);
+      throw new Error("Erro do Servidor: " + errText);
     }
 
     const result = await response.json();

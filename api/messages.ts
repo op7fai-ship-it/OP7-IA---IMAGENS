@@ -66,6 +66,6 @@ export default async function handler(req: any, res: any) {
             return res.status(404).json({ ok: false, error: 'Not found' });
         }
         console.error(`❌ [BACKEND ERROR] /api/messages:`, error);
-        return res.status(500).json({ ok: false, error: error.message });
+        return res.status(500).json({ ok: false, error: error.message || 'Erro interno no servidor' });
     }
 }

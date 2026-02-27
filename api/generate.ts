@@ -6,34 +6,33 @@ import { toErrorResponse } from "../lib/api/error";
 // 🚀 ANTI-BUG: Rota imutável. UI depende de /api/generate
 export const runtime = 'nodejs';
 
-const MODELS = ["gemini-1.5-flash-001", "gemini-2.0-flash-exp", "gemini-flash-latest"];
+const MODELS = ["gemini-1.5-flash", "gemini-2.0-flash-exp", "gemini-flash-latest"];
 const IMAGEN_MODEL = "imagen-3.0-generate-001";
 
 export default async function handler(req: any, res: any) {
   res.setHeader("Content-Type", "application/json");
 
-  // 🛡️ FAIL-SAFE: Verificação Manual de Infraestrutura
-  if (!process.env.GEMINI_API_KEY) {
-    return res.status(500).json({ ok: false, error: 'Chave Gemini ausente no servidor' });
-  }
-
   try {
-    console.log("HIT /api/generate");
-    const API_KEY = process.env.GEMINI_API_KEY;
+    const { prompt, images, options } = req.body;
+    console.log("Iniciando geração para prompt:", prompt?.substring(0, 50));
+
+    // 🛡️ FAIL-SAFE: Verificação Manual de Infraestrutura
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(500).json({ ok: false, error: 'Chave Gemini ausente no servidor' });
+    }
 
     if (req.method !== 'POST') {
       return res.status(405).json({ ok: false, error: "Apenas POST permitido" });
     }
 
-    const { prompt, format, images, options } = req.body;
-    console.log("BODY RECEIVED");
+    const { format } = req.body;
+    const API_KEY = process.env.GEMINI_API_KEY;
+    const genAI = new GoogleGenerativeAI(API_KEY);
+    const engine = options?.engine === 'imagen' ? 'imagen' : 'nano';
 
     if (!prompt || prompt.trim() === '') {
       return res.status(400).json({ ok: false, error: "O prompt não pode estar vazio." });
     }
-
-    const genAI = new GoogleGenerativeAI(API_KEY);
-    const engine = options?.engine === 'imagen' ? 'imagen' : 'nano';
 
     const paletteObj = options?.palette || {
       primary: '#002B5B',
@@ -137,8 +136,8 @@ export default async function handler(req: any, res: any) {
           const mimeType = match[1];
           const base64Data = match[2];
 
-          // Optimization: If image is small (< 100KB), send directly
-          if (base64Data.length < 133333) {
+          // Optimization: If image is small (< 4MB), send directly
+          if (base64Data.length < 5242880) {
             parts.push({ inlineData: { mimeType, data: base64Data } });
             continue;
           }
@@ -241,6 +240,6 @@ export default async function handler(req: any, res: any) {
 
   } catch (error: any) {
     console.error("💥 [BACKEND CRITICAL]:", error);
-    return res.status(500).json({ ok: false, error: error.message });
+    return res.status(500).json({ ok: false, error: error.message || 'Erro interno no servidor' });
   }
 }
