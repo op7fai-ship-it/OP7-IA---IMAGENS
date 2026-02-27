@@ -6,7 +6,7 @@ import { toErrorResponse } from "../lib/api/error";
 // 🚀 ANTI-BUG: Rota imutável. UI depende de /api/generate
 export const runtime = 'nodejs';
 
-const MODELS = ["gemini-2.0-flash-exp", "gemini-1.5-flash-001", "gemini-flash-latest"];
+const MODELS = ["gemini-1.5-flash-001", "gemini-2.0-flash-exp", "gemini-flash-latest"];
 const IMAGEN_MODEL = "imagen-3.0-generate-001";
 
 export default async function handler(req: any, res: any) {
@@ -136,11 +136,18 @@ export default async function handler(req: any, res: any) {
         if (match) {
           const mimeType = match[1];
           const base64Data = match[2];
+
+          // Optimization: If image is small (< 100KB), send directly
+          if (base64Data.length < 133333) {
+            parts.push({ inlineData: { mimeType, data: base64Data } });
+            continue;
+          }
+
           try {
             const buffer = Buffer.from(base64Data, 'base64');
             const compressedBuffer = await sharp(buffer)
-              .resize({ width: 1024, height: 1024, fit: 'inside', withoutEnlargement: true })
-              .jpeg({ quality: 80 })
+              .resize({ width: 800, height: 800, fit: 'inside', withoutEnlargement: true })
+              .jpeg({ quality: 75 })
               .toBuffer();
             parts.push({ inlineData: { mimeType: 'image/jpeg', data: compressedBuffer.toString('base64') } });
           } catch (sharpError) {
