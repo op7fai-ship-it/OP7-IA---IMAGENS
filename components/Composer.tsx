@@ -83,6 +83,121 @@ export const Composer: React.FC<ComposerProps> = ({ onGenerate, isGenerating, la
 
     return (
         <div className="w-full max-w-4xl mx-auto p-6 space-y-4">
+            {/* Options Panel (Moved above the input for better accessibility) */}
+            {showOptions && (
+                <div className="flex flex-col gap-4 p-6 bg-white/60 backdrop-blur-xl border border-white/80 rounded-[28px] shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-300 mb-2 border-b-4 border-b-op7-blue/20">
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-op7-navy uppercase tracking-widest">Engine de Imagem</label>
+                            <select
+                                value={options.engine}
+                                title="Selecione o motor de geração"
+                                onChange={(e) => setOptions({ ...options, engine: e.target.value as 'nano' | 'imagen' })}
+                                className="w-full bg-op7-blue/5 border border-op7-blue/20 rounded-xl px-3 py-2 text-sm font-black text-op7-blue focus:ring-2 focus:ring-op7-blue/20 outline-none"
+                            >
+                                <option value="nano">🍌 Nano Banana</option>
+                                <option value="imagen">🔥 Imagen (Top)</option>
+                            </select>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-op7-navy uppercase tracking-widest">Formato</label>
+                            <select
+                                value={options.format}
+                                onChange={(e) => setOptions({ ...options, format: e.target.value as AdSize })}
+                                className="w-full bg-white border border-op7-border rounded-xl px-3 py-2 text-sm font-bold text-op7-navy focus:ring-2 focus:ring-op7-blue/20 outline-none"
+                            >
+                                <option value="1080x1350">Feed (4:5)</option>
+                                <option value="1080x1920">Stories (9:16)</option>
+                                <option value="1080x1080">Quadrado (1:1)</option>
+                            </select>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-op7-navy uppercase tracking-widest">Tom</label>
+                            <select
+                                value={options.tone}
+                                onChange={(e) => setOptions({ ...options, tone: e.target.value as ToneType })}
+                                className="w-full bg-white border border-op7-border rounded-xl px-3 py-2 text-sm font-bold text-op7-navy focus:ring-2 focus:ring-op7-blue/20 outline-none"
+                            >
+                                <option value="Premium">💎 Premium</option>
+                                <option value="Direto">🎯 Direto</option>
+                                <option value="Urgente">🔥 Urgente</option>
+                                <option value="Elegante">✨ Elegante</option>
+                            </select>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-op7-navy uppercase tracking-widest">Estilo do Fundo</label>
+                            <select
+                                value={options.backgroundStyle}
+                                onChange={(e) => setOptions({ ...options, backgroundStyle: e.target.value as BackgroundStyle })}
+                                className="w-full bg-white border border-op7-border rounded-xl px-3 py-2 text-sm font-bold text-op7-navy focus:ring-2 focus:ring-op7-blue/20 outline-none"
+                            >
+                                <option value="Clean">⚪ Clean</option>
+                                <option value="Tech">💻 Tech</option>
+                                <option value="Clínica">🏥 Clínica</option>
+                                <option value="Urbano">🏙️ Urbano</option>
+                                <option value="Minimalista">♟️ Minimalista</option>
+                            </select>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-op7-navy uppercase tracking-widest">Idioma</label>
+                            <select
+                                value={options.language}
+                                onChange={(e) => setOptions({ ...options, language: e.target.value })}
+                                className="w-full bg-white border border-op7-border rounded-xl px-3 py-2 text-sm font-bold text-op7-navy focus:ring-2 focus:ring-op7-blue/20 outline-none"
+                            >
+                                <option value="PT-BR">Brasil (PT-BR)</option>
+                                <option value="EN">English (EN)</option>
+                                <option value="ES">Espanol (ES)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="border-t border-op7-border/20 pt-4">
+                        <div className="flex items-center justify-between mb-3">
+                            <label className="text-[10px] font-black text-op7-navy uppercase tracking-widest">Paleta de Cores</label>
+                            <button
+                                type="button"
+                                onClick={() => setOptions({ ...options, palette: defaultPalette })}
+                                className="text-[10px] font-bold text-op7-blue hover:underline"
+                            >
+                                Reset OP7
+                            </button>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                            {(['primary', 'secondary', 'background', 'text', 'accent'] as const).map(colorKey => (
+                                <div key={colorKey} className="flex flex-col gap-1">
+                                    <span className="text-[9px] font-bold text-slate-500 uppercase">{colorKey}</span>
+                                    <div className="flex items-center overflow-hidden rounded-lg border border-op7-border bg-white">
+                                        <input
+                                            type="color"
+                                            value={options.palette?.[colorKey] || '#000000'}
+                                            onChange={e => setOptions({
+                                                ...options,
+                                                palette: { ...options.palette!, [colorKey]: e.target.value }
+                                            })}
+                                            className="w-6 h-6 p-0 border-0 rounded-none cursor-pointer"
+                                        />
+                                        <input
+                                            type="text"
+                                            value={options.palette?.[colorKey] || '#000000'}
+                                            onChange={e => setOptions({
+                                                ...options,
+                                                palette: { ...options.palette!, [colorKey]: e.target.value }
+                                            })}
+                                            className="w-full text-xs font-medium px-2 py-1 outline-none uppercase"
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="relative group">
                 <div className="absolute -inset-1 bg-gradient-to-r from-op7-blue to-op7-accent rounded-[32px] blur opacity-25 group-hover:opacity-40 transition duration-1000 group-hover:duration-200"></div>
                 <form
@@ -203,120 +318,6 @@ export const Composer: React.FC<ComposerProps> = ({ onGenerate, isGenerating, la
                     </div>
                 </form>
             </div>
-
-            {/* Options Panel */}
-            {showOptions && (
-                <div className="flex flex-col gap-4 p-6 bg-white/40 backdrop-blur-xl border border-white/60 rounded-[28px] shadow-lg animate-in fade-in slide-in-from-top-4 duration-300">
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-op7-navy uppercase tracking-widest">Engine de Imagem</label>
-                            <select
-                                value={options.engine}
-                                onChange={(e) => setOptions({ ...options, engine: e.target.value as 'nano' | 'imagen' })}
-                                className="w-full bg-op7-blue/5 border border-op7-blue/20 rounded-xl px-3 py-2 text-sm font-black text-op7-blue focus:ring-2 focus:ring-op7-blue/20 outline-none"
-                            >
-                                <option value="nano">🍌 Nano Banana</option>
-                                <option value="imagen">🔥 Imagen (Top)</option>
-                            </select>
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-op7-navy uppercase tracking-widest">Formato</label>
-                            <select
-                                value={options.format}
-                                onChange={(e) => setOptions({ ...options, format: e.target.value as AdSize })}
-                                className="w-full bg-white border border-op7-border rounded-xl px-3 py-2 text-sm font-bold text-op7-navy focus:ring-2 focus:ring-op7-blue/20 outline-none"
-                            >
-                                <option value="1080x1350">Feed (4:5)</option>
-                                <option value="1080x1920">Stories (9:16)</option>
-                                <option value="1080x1080">Quadrado (1:1)</option>
-                            </select>
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-op7-navy uppercase tracking-widest">Tom</label>
-                            <select
-                                value={options.tone}
-                                onChange={(e) => setOptions({ ...options, tone: e.target.value as ToneType })}
-                                className="w-full bg-white border border-op7-border rounded-xl px-3 py-2 text-sm font-bold text-op7-navy focus:ring-2 focus:ring-op7-blue/20 outline-none"
-                            >
-                                <option value="Premium">💎 Premium</option>
-                                <option value="Direto">🎯 Direto</option>
-                                <option value="Urgente">🔥 Urgente</option>
-                                <option value="Elegante">✨ Elegante</option>
-                            </select>
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-op7-navy uppercase tracking-widest">Estilo do Fundo</label>
-                            <select
-                                value={options.backgroundStyle}
-                                onChange={(e) => setOptions({ ...options, backgroundStyle: e.target.value as BackgroundStyle })}
-                                className="w-full bg-white border border-op7-border rounded-xl px-3 py-2 text-sm font-bold text-op7-navy focus:ring-2 focus:ring-op7-blue/20 outline-none"
-                            >
-                                <option value="Clean">⚪ Clean</option>
-                                <option value="Tech">💻 Tech</option>
-                                <option value="Clínica">🏥 Clínica</option>
-                                <option value="Urbano">🏙️ Urbano</option>
-                                <option value="Minimalista">♟️ Minimalista</option>
-                            </select>
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-op7-navy uppercase tracking-widest">Idioma</label>
-                            <select
-                                value={options.language}
-                                onChange={(e) => setOptions({ ...options, language: e.target.value })}
-                                className="w-full bg-white border border-op7-border rounded-xl px-3 py-2 text-sm font-bold text-op7-navy focus:ring-2 focus:ring-op7-blue/20 outline-none"
-                            >
-                                <option value="PT-BR">Brasil (PT-BR)</option>
-                                <option value="EN">English (EN)</option>
-                                <option value="ES">Espanol (ES)</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div className="border-t border-op7-border/20 pt-4">
-                        <div className="flex items-center justify-between mb-3">
-                            <label className="text-[10px] font-black text-op7-navy uppercase tracking-widest">Paleta de Cores</label>
-                            <button
-                                type="button"
-                                onClick={() => setOptions({ ...options, palette: defaultPalette })}
-                                className="text-[10px] font-bold text-op7-blue hover:underline"
-                            >
-                                Reset OP7
-                            </button>
-                        </div>
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                            {(['primary', 'secondary', 'background', 'text', 'accent'] as const).map(colorKey => (
-                                <div key={colorKey} className="flex flex-col gap-1">
-                                    <span className="text-[9px] font-bold text-slate-500 uppercase">{colorKey}</span>
-                                    <div className="flex items-center overflow-hidden rounded-lg border border-op7-border bg-white">
-                                        <input
-                                            type="color"
-                                            value={options.palette?.[colorKey] || '#000000'}
-                                            onChange={e => setOptions({
-                                                ...options,
-                                                palette: { ...options.palette!, [colorKey]: e.target.value }
-                                            })}
-                                            className="w-6 h-6 p-0 border-0 rounded-none cursor-pointer"
-                                        />
-                                        <input
-                                            type="text"
-                                            value={options.palette?.[colorKey] || '#000000'}
-                                            onChange={e => setOptions({
-                                                ...options,
-                                                palette: { ...options.palette!, [colorKey]: e.target.value }
-                                            })}
-                                            className="w-full text-xs font-medium px-2 py-1 outline-none uppercase"
-                                        />
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {/* Quick Chips */}
             <div className="flex flex-wrap items-center justify-center gap-2 pt-2">

@@ -80,7 +80,7 @@ export const generateCreative = async (
 
     if (onProgress) onProgress({ step: 'Arte pronta!', percentage: 100 });
 
-    return result.data as CreativeResponse;
+    return { ...result.data, messageId: result.messageId } as CreativeResponse;
   } catch (error: any) {
     console.error("❌ [SERVICE ERROR]:", error.message);
     throw error;

@@ -58,19 +58,25 @@ const App: React.FC = () => {
       if (!text) return;
 
       const json = JSON.parse(text);
-      if (json.ok) setConversations(json.data);
+      if (json.ok && json.data && json.data.length > 0) {
+        setConversations(json.data);
+        // Se estiver no primeiro load e não tiver conversa ativa, carregar a última
+        if (!activeConversationId && view === 'chat') {
+          handleSelectConversation(json.data[0].id, true);
+        }
+      }
     } catch (err) {
       console.warn("Conversations API não disponível localmente.", err);
     }
-  }, [userId]);
+  }, [userId, activeConversationId, view]);
 
   useEffect(() => {
     fetchConversations();
-  }, [fetchConversations]);
+  }, []); // Rodar apenas uma vez no mount
 
-  const handleSelectConversation = async (id: string) => {
+  const handleSelectConversation = async (id: string, isInitialLoad = false) => {
     setActiveConversationId(id);
-    setView('chat');
+    if (!isInitialLoad) setView('chat');
 
     try {
       const res = await fetch(`/api/messages?conversationId=${id}`);
@@ -82,6 +88,13 @@ const App: React.FC = () => {
       const json = JSON.parse(text);
       if (json.ok && json.data) {
         setMessages(json.data);
+
+        // Restore the last config if it exists
+        const lastAssistantMsg = [...json.data].reverse().find(m => m.role === 'assistant' && m.content && m.content.config);
+        if (lastAssistantMsg) {
+          setConfig(lastAssistantMsg.content.config);
+          setLastPrompt(json.data.find((m: any) => m.role === 'user')?.content?.text || '');
+        }
       }
     } catch (err) {
       console.warn("Messages API não disponível localmente.", err);
@@ -121,6 +134,20 @@ const App: React.FC = () => {
       console.error(err);
     }
   };
+
+  // 🛡️ MECANISMO DE DESTRAVAMENTO (PANIC UNLOCK)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        console.warn("🔐 [PANIC UNLOCK] Tecla ESC detectada. Resetando estados de trava.");
+        setStatus(GenerationStatus.IDLE);
+        setProgress({ step: 'Pronto', percentage: 100 });
+        setErrorModalInfo(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const addToHistory = useCallback((newConfig: DesignConfig) => {
     setHistory(prev => {
@@ -179,26 +206,26 @@ const App: React.FC = () => {
       setStatus(GenerationStatus.ERROR);
 
       try {
-        const parsed = JSON.parse(error.message);
-        console.error("STATUS HTTP:", parsed.httpStatus);
-        console.error("CÓDIGO:", parsed.code);
-        console.error("DETALHES:", parsed.details);
-
-        // Retira a msg otimista se falhou
-        setMessages(prev => prev.filter(m => m.role !== 'user' || m.content.text !== prompt));
-
+        const parsedBody = JSON.parse(error.message);
         setErrorModalInfo({
-          title: `Erro: ${parsed.code}`,
-          message: parsed.message,
-          details: parsed.details || "Sem detalhes adicionais"
+          title: `Erro: ${parsedBody.code || 'Desconhecido'}`,
+          message: parsedBody.message || "Ocorreu um erro no processamento.",
+          details: parsedBody.details || error.message
         });
       } catch (e) {
         setErrorModalInfo({
-          title: "Erro Inesperado",
-          message: "Ocorreu uma falha grave na comunicação com o servidor.",
+          title: "Erro na IA",
+          message: "A IA não conseguiu processar seu pedido. Tente simplificar o prompt.",
           details: error.message
         });
       }
+    } finally {
+      // 🛡️ GARANTIA ABSOLUTA DE DESTRAVAMENTO
+      // Se não houver erro, garante status SUCCESS para fechar overlays no CanvasEditor
+      setStatus(prev => (prev === GenerationStatus.ERROR ? GenerationStatus.ERROR : GenerationStatus.SUCCESS));
+
+      setProgress({ step: 'Finalizado', percentage: 100 });
+      console.log("🔓 [APP] UI reativada.");
     }
   };
 
@@ -311,8 +338,16 @@ const App: React.FC = () => {
 
             <div className="h-10 w-px bg-slate-100" />
 
-            <div className="flex flex-col items-end">
-              <span className="text-[10px] font-black text-op7-navy uppercase tracking-widest leading-none">Motor de IA</span>
+            <div
+              className="flex flex-col items-end cursor-pointer group"
+              onClick={() => {
+                console.log("🛠️ [DEV] Force Reset Status triggered.");
+                setStatus(GenerationStatus.IDLE);
+                setProgress({ step: 'Pronto', percentage: 100 });
+              }}
+              title="Clique para destravar a UI em caso de erro"
+            >
+              <span className="text-[10px] font-black text-op7-navy uppercase tracking-widest leading-none group-hover:text-op7-blue transition-colors">Motor de IA</span>
               <span className={`text-[10px] font-bold mt-1 uppercase flex items-center gap-1.5 ${status === GenerationStatus.SUCCESS ? 'text-green-500' : 'text-op7-blue animate-pulse'}`}>
                 <div className={`w-1.5 h-1.5 rounded-full ${status === GenerationStatus.SUCCESS ? 'bg-green-500' : 'bg-op7-blue shadow-[0_0_8px_rgba(26,115,232,0.5)]'}`} />
                 {status === GenerationStatus.IDLE ? 'Pronto' :
@@ -328,56 +363,59 @@ const App: React.FC = () => {
 
         <main className="flex-1 relative overflow-hidden flex flex-col bg-slate-50/50">
           {view === 'chat' ? (
-            <div className={`flex-1 flex flex-col items-center p-6 bg-gradient-to-b from-white to-slate-50/30 ${messages.length === 0 ? 'justify-center' : 'justify-end'}`}>
+            <div className="absolute inset-0 flex flex-col">
+              <div className={`flex-1 overflow-y-auto w-full flex flex-col items-center p-6 bg-gradient-to-b from-white to-slate-50/30 ${messages.length === 0 ? 'justify-center' : 'justify-start'}`}>
+                {messages.length === 0 ? (
+                  <div className="w-full max-w-2xl text-center space-y-4 my-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
+                    <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-op7-navy text-white rounded-full text-[10px] font-black uppercase tracking-[0.2em] mb-4 shadow-lg shadow-op7-navy/20">
+                      <Sparkles size={12} className="text-op7-accent" />
+                      Powered by OP7 Intelligence
+                    </div>
+                    <h2 className="text-5xl font-black text-op7-navy tracking-tight leading-[0.9]">
+                      Transforme ideias em <br />
+                      <span className="text-op7-blue bg-clip-text text-transparent bg-gradient-to-r from-op7-blue to-cyan-500">Criativos de Elite</span>
+                    </h2>
+                    <p className="text-slate-500 font-medium max-w-lg mx-auto leading-relaxed">
+                      A primeira IA do mercado focada em design psicológico para tráfego pago. Descreva seu produto e nós fazemos o resto.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="w-full max-w-4xl flex-1 mt-4 relative flex flex-col">
+                    <ChatStream
+                      messages={messages}
+                      onOpenEditor={loadPastGenerationEditor}
+                      isGenerating={status === GenerationStatus.INTERPRETING || status === GenerationStatus.GENERATING_ART || status === GenerationStatus.GENERATING_TEXT || status === GenerationStatus.ASSEMBLING}
+                    />
+                  </div>
+                )}
 
-              {messages.length === 0 ? (
-                <div className="w-full max-w-2xl text-center space-y-4 mb-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                  <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-op7-navy text-white rounded-full text-[10px] font-black uppercase tracking-[0.2em] mb-4 shadow-lg shadow-op7-navy/20">
-                    <Sparkles size={12} className="text-op7-accent" />
-                    Powered by OP7 Intelligence
+                {messages.length === 0 && (
+                  <div className="mt-12 flex items-center gap-8 text-slate-300">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 font-bold">1</div>
+                      <span className="text-[10px] font-black uppercase tracking-widest">Prompt</span>
+                    </div>
+                    <ChevronRight size={14} className="opacity-50" />
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 font-bold">2</div>
+                      <span className="text-[10px] font-black uppercase tracking-widest">Geração</span>
+                    </div>
+                    <ChevronRight size={14} className="opacity-50" />
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-op7-blue text-white flex items-center justify-center text-xs font-bold shadow-lg shadow-op7-blue/20">3</div>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-op7-navy">Editor</span>
+                    </div>
                   </div>
-                  <h2 className="text-5xl font-black text-op7-navy tracking-tight leading-[0.9]">
-                    Transforme ideias em <br />
-                    <span className="text-op7-blue bg-clip-text text-transparent bg-gradient-to-r from-op7-blue to-cyan-500">Criativos de Elite</span>
-                  </h2>
-                  <p className="text-slate-500 font-medium max-w-lg mx-auto leading-relaxed">
-                    A primeira IA do mercado focada em design psicológico para tráfego pago. Descreva seu produto e nós fazemos o resto.
-                  </p>
-                </div>
-              ) : (
-                <div className="w-full max-w-4xl flex-1 mt-4 relative overflow-hidden flex flex-col">
-                  <ChatStream
-                    messages={messages}
-                    onOpenEditor={loadPastGenerationEditor}
-                    isGenerating={status === GenerationStatus.INTERPRETING || status === GenerationStatus.GENERATING_ART || status === GenerationStatus.GENERATING_TEXT || status === GenerationStatus.ASSEMBLING}
-                  />
-                </div>
-              )}
+                )}
+              </div>
 
-              <Composer
-                onGenerate={handleGenerate}
-                isGenerating={status !== GenerationStatus.IDLE && status !== GenerationStatus.SUCCESS && status !== GenerationStatus.ERROR}
-                lastPrompt={lastPrompt}
-              />
-
-              {messages.length === 0 && (
-                <div className="mt-12 flex items-center gap-8 text-slate-300">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 font-bold">1</div>
-                    <span className="text-[10px] font-black uppercase tracking-widest">Prompt</span>
-                  </div>
-                  <ChevronRight size={14} className="opacity-50" />
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 font-bold">2</div>
-                    <span className="text-[10px] font-black uppercase tracking-widest">Geração</span>
-                  </div>
-                  <ChevronRight size={14} className="opacity-50" />
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-op7-blue text-white flex items-center justify-center text-xs font-bold shadow-lg shadow-op7-blue/20">3</div>
-                    <span className="text-[10px] font-black uppercase tracking-widest text-op7-navy">Editor</span>
-                  </div>
-                </div>
-              )}
+              <div className="w-full bg-white/40 backdrop-blur-sm border-t border-op7-border/10 p-4">
+                <Composer
+                  onGenerate={handleGenerate}
+                  isGenerating={status !== GenerationStatus.IDLE && status !== GenerationStatus.SUCCESS && status !== GenerationStatus.ERROR}
+                  lastPrompt={lastPrompt}
+                />
+              </div>
             </div>
           ) : (
             <CanvasEditor

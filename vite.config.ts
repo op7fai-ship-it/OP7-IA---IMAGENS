@@ -8,16 +8,19 @@ export default defineConfig(({ mode }) => {
 
   const API_KEY = env.GEMINI_API_KEY || process.env.GEMINI_API_KEY;
 
-  // Anti-leak mechanism: fail the build if GEMINI is present in client bundle vars
-  if (env.VITE_GEMINI_API_KEY || Object.keys(env).some(k => k.includes('VITE_') && k.includes('GEMINI'))) {
-    throw new Error("🚨 SECURITY ALERT: Gemini API Key detectada sendo exposta ao frontend (Variável com prefixo VITE_). Construção abortada para evitar vazamentos.");
+  // 🛡️ ANTI-BUG & SECURITY MODE
+  const hasClientLeak = Object.keys(env).some(k =>
+    (k.includes('VITE_') || k.includes('NEXT_PUBLIC_')) && k.includes('GEMINI')
+  );
+
+  if (hasClientLeak) {
+    throw new Error("🚨 SECURITY ALERT: Gemini API Key detectada sendo exposta ao frontend. Certifique-se de que a variável NÃO comece com VITE_ ou NEXT_PUBLIC_.");
   }
 
   return {
     server: {
       port: 3000,
       host: '0.0.0.0',
-      proxy: {},
     },
     plugins: [
       react(),
@@ -25,161 +28,189 @@ export default defineConfig(({ mode }) => {
         name: 'mock-api-plugin',
         configureServer(server) {
           server.middlewares.use(async (req, res, next) => {
-            if (req.url?.startsWith('/api/health')) {
+            const url = new URL(req.url || '/', `http://${req.headers.host}`);
+
+            // --- PERSISTÊNCIA MOCK LOCAL EM MEMÓRIA (GLOBAL PARA VITE) ---
+            if (!global.__MOCK_DB) {
+              global.__MOCK_DB = { conversations: [], messages: [] };
+            }
+            const db = global.__MOCK_DB;
+
+            // 1. HEALTH CHECK
+            if (url.pathname === '/api/health') {
               res.setHeader('Content-Type', 'application/json');
-              res.statusCode = 200;
-              res.end(JSON.stringify({ ok: true, api: "working" }));
-              return;
+              return res.end(JSON.stringify({ ok: true, api: "working", dbConnected: true }));
             }
 
-            if (req.url?.startsWith('/api/generate')) {
+            // 2. CONVERSATIONS
+            if (url.pathname === '/api/conversations') {
               res.setHeader('Content-Type', 'application/json');
+              const id = url.searchParams.get('id');
+              const userId = url.searchParams.get('userId');
 
+              if (req.method === 'GET') {
+                if (id) {
+                  const conv = db.conversations.find(c => c.id === id);
+                  const msgs = db.messages.filter(m => m.conversation_id === id);
+                  return res.end(JSON.stringify({ ok: true, data: { ...conv, messages: msgs } }));
+                }
+                const userConvs = db.conversations.filter(c => c.user_id === userId);
+                return res.end(JSON.stringify({ ok: true, data: userConvs }));
+              }
+
+              if (req.method === 'POST') {
+                let body = '';
+                req.on('data', chunk => { body += chunk; });
+                req.on('end', () => {
+                  const { user_id, title } = JSON.parse(body);
+                  const newConv = {
+                    id: Math.random().toString(36).substr(2, 9),
+                    user_id,
+                    title: title || 'Nova Arte',
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                  };
+                  db.conversations.push(newConv);
+                  res.end(JSON.stringify({ ok: true, data: newConv }));
+                });
+                return;
+              }
+
+              if (req.method === 'PATCH') {
+                let body = '';
+                req.on('data', chunk => { body += chunk; });
+                req.on('end', () => {
+                  const { title } = JSON.parse(body);
+                  const conv = db.conversations.find(c => c.id === id);
+                  if (conv) {
+                    conv.title = title;
+                    conv.updated_at = new Date().toISOString();
+                  }
+                  res.end(JSON.stringify({ ok: true, data: conv }));
+                });
+                return;
+              }
+
+              if (req.method === 'DELETE') {
+                db.conversations = db.conversations.filter(c => c.id !== id);
+                db.messages = db.messages.filter(m => m.conversation_id !== id);
+                return res.end(JSON.stringify({ ok: true }));
+              }
+            }
+
+            // 3. MESSAGES
+            if (url.pathname === '/api/messages') {
+              res.setHeader('Content-Type', 'application/json');
+              const conversationId = url.searchParams.get('conversationId');
+              const messageId = url.searchParams.get('messageId');
+
+              if (req.method === 'GET') {
+                if (conversationId) {
+                  const msgs = db.messages.filter(m => m.conversation_id === conversationId);
+                  return res.end(JSON.stringify({ ok: true, data: msgs }));
+                }
+                if (messageId) {
+                  const msg = db.messages.find(m => m.id === messageId);
+                  return res.end(JSON.stringify({ ok: true, data: { result: msg?.content } }));
+                }
+              }
+            }
+
+            // 4. GENERATE
+            if (url.pathname === '/api/generate') {
+              res.setHeader('Content-Type', 'application/json');
               if (req.method !== 'POST') {
                 res.statusCode = 405;
-                res.end(JSON.stringify({ ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Apenas POST permitido' } }));
-                return;
+                return res.end(JSON.stringify({ ok: false, error: "Method not allowed" }));
+              }
+
+              if (!API_KEY) {
+                res.statusCode = 500;
+                return res.end(JSON.stringify({ ok: false, error: { message: "GEMINI_API_KEY não configurada" } }));
               }
 
               let bodyBuffer = '';
               req.on('data', chunk => { bodyBuffer += chunk; });
               req.on('end', async () => {
                 try {
-                  const parsedBody = JSON.parse(bodyBuffer);
-                  const { prompt, options, images } = parsedBody;
-
-                  if (!API_KEY) {
-                    res.statusCode = 500;
-                    return res.end(JSON.stringify({ ok: false, error: { message: "GEMINI_API_KEY não configurada no .env.local" } }));
-                  }
+                  const body = JSON.parse(bodyBuffer);
+                  const { prompt, options, images } = body;
+                  const conversationId = options?.conversationId;
+                  const userId = options?.userId;
 
                   const genAI = new GoogleGenerativeAI(API_KEY);
-                  const MODELS = ["gemini-1.5-flash-001", "gemini-flash-latest"];
+                  const MODELS = ["gemini-1.5-flash-001", "gemini-2.0-flash-exp", "gemini-flash-latest"];
+                  const p = options?.palette || { primary: '#002B5B', accent: '#FF7D3C', background: '#F8FAFC', text: '#002B5B' };
 
-                  res.setHeader('Content-Type', 'application/json');
+                  const instructions = `Atue como Diretor de Arte OP7. SIGA RIGOROSAMENTE A PALETA E REFERÊNCIAS. Retorne JSON: { "headline": "...", "description": "...", "cta": "...", "backgroundPrompt": "...", "config": { "size": "${options?.format || '1080x1350'}", "backgroundColor": "${p.background}", "backgroundImage": "URL", "layers": [ { "id": "art", "type": "image", "content": "URL", "position": {"x": 50, "y": 45}, "size": {"width": 60, "height": 40}, "style": {"borderRadius": 20} }, { "id": "headline", "type": "text", "content": "TÍTULO", "position": {"x": 50, "y": 25}, "size": {"width": 80, "height": 10}, "style": {"color": "${p.text}", "fontSize": 4, "fontWeight": "900", "fontFamily": "Montserrat", "textAlign": "center"} } ] } }`;
 
-                  console.log("🛠️ [LOCAL] Simulando /api/generate...");
-                  const p = options?.palette || {
-                    primary: '#002B5B',
-                    secondary: '#1A73E8',
-                    background: '#F8FAFC',
-                    text: '#002B5B',
-                    accent: '#FF7D3C'
-                  };
-                  const instructions = `Atue como Diretor de Arte OP7. Retorne JSON: { "headline": "Título Local", "description": "Desc Local", "cta": "CTA Local", "backgroundPrompt": "Background", "config": { "size": "${options?.format || '1080x1350'}", "backgroundColor": "${p.background}", "backgroundImage": "https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&w=1080&q=80", "overlayOpacity": 0.2, "layers": [ { "id": "headline", "type": "text", "name": "Título", "content": "HEADLINE", "position": {"x": 50, "y": 30}, "size": {"width": 80, "height": 20}, "style": {"color": "${p.text}", "fontSize": 4, "fontWeight": "900", "fontFamily": "Montserrat", "textAlign": "center", "textTransform": "uppercase"} }, { "id": "subheadline", "type": "text", "name": "Sub", "content": "Descrição", "position": {"x": 50, "y": 55}, "size": {"width": 70, "height": 10}, "style": {"color": "${p.secondary}", "fontSize": 1.5, "fontWeight": "600", "fontFamily": "Outfit", "textAlign": "center"} }, { "id": "cta", "type": "button", "name": "CTA", "content": "SAIBA MAIS", "position": {"x": 50, "y": 80}, "size": {"width": 40, "height": 8}, "style": {"color": "#FFFFFF", "backgroundColor": "${p.accent}", "fontSize": 1.2, "fontWeight": "900", "fontFamily": "Montserrat", "borderRadius": 50, "padding": 20} } ] } }`;
+                  const parts: any[] = [{ text: instructions }, { text: `USUÁRIO PEDIU: ${prompt}` }];
 
-                  const parts: any[] = [{ text: instructions }];
+                  // Adicionar referências se existirem
                   if (options?.useReferences !== false && images && images.length > 0) {
                     for (const img of images) {
                       const match = img.match(/^data:(.*);base64,(.*)$/);
-                      if (match) {
-                        const mimeType = match[1];
-                        const base64Data = match[2];
-                        try {
-                          // Importante: No Vite config pode dar require() em runtime ou importar no topo
-                          const sharp = require('sharp');
-                          const buffer = Buffer.from(base64Data, 'base64');
-                          const compressedBuffer = await sharp(buffer)
-                            .resize({ width: 1024, height: 1024, fit: 'inside', withoutEnlargement: true })
-                            .jpeg({ quality: 80 })
-                            .toBuffer();
-
-                          const compressedBase64 = compressedBuffer.toString('base64');
-                          const sizeInMB = (compressedBase64.length * (3 / 4)) / (1024 * 1024);
-                          if (sizeInMB > 4) {
-                            res.statusCode = 400;
-                            return res.end(JSON.stringify({ ok: false, error: { code: "IMAGE_TOO_LARGE", message: "Referência muito pesada. Envie imagens menores." } }));
-                          }
-
-                          parts.push({ inlineData: { mimeType: 'image/jpeg', data: compressedBase64 } });
-                        } catch (err) {
-                          console.error("❌ [LOCAL ERROR] Falha ao comprimir:", err);
-                          parts.push({ inlineData: { mimeType, data: base64Data } });
-                        }
-                      }
+                      if (match) parts.push({ inlineData: { mimeType: match[1], data: match[2] } });
                     }
                   }
 
                   let lastError = null;
+                  let data = null;
+
                   for (const modelName of MODELS) {
                     try {
-                      console.log(`🤖 [LOCAL] Tentando modelo: ${modelName}`);
-                      const model = genAI.getGenerativeModel({
-                        model: modelName,
-                        generationConfig: { responseMimeType: "application/json" }
-                      });
-                      const generationPromise = model.generateContent({ contents: [{ role: 'user', parts }] });
-                      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout of 25s exceeded")), 25000));
-
-                      const result: any = await Promise.race([generationPromise, timeoutPromise]);
-
-                      console.log("Modelo Gemini usado:", modelName);
-                      const text = result.response.text();
-                      const data = JSON.parse(text);
-
-                      // --- ENGINE SELECTION LOCAL ---
-                      if (options?.engine === 'imagen') {
-                        console.log("🎨 [LOCAL MOCK] Imagen engine selected");
-                        data.imageUrl = `https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2000&auto=format&fit=crop`;
-                        data.config.backgroundImage = data.imageUrl;
-                      } else {
-                        data.imageUrl = `https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&w=1080&q=80`;
-                        data.config.backgroundImage = data.imageUrl;
-                      }
-
-                      let dbPayload = {};
-                      try {
-                        const { prompt, options, images, conversationId, userId } = JSON.parse(bodyBuffer);
-                        if (conversationId && userId) {
-                          const { createClient } = require('@supabase/supabase-js');
-                          const supabaseUrl = env.VITE_SUPABASE_URL || env.SUPABASE_URL;
-                          const supabaseKey = env.SUPABASE_SERVICE_ROLE_KEY || env.VITE_SUPABASE_ANON_KEY || env.SUPABASE_ANON_KEY;
-
-                          if (supabaseUrl && supabaseKey) {
-                            const supabase = createClient(supabaseUrl, supabaseKey);
-
-                            const { data: userMsg } = await supabase.from('messages')
-                              .insert([{ conversation_id: conversationId, user_id: userId, role: 'user', content: { text: prompt } }])
-                              .select().single();
-
-                            const { data: assistantMsg } = await supabase.from('messages')
-                              .insert([{ conversation_id: conversationId, user_id: userId, role: 'assistant', content: data }])
-                              .select().single();
-
-                            if (userMsg && assistantMsg) {
-                              await supabase.from('generations').insert([{
-                                conversation_id: conversationId,
-                                message_id: assistantMsg.id,
-                                prompt: prompt,
-                                palette: p,
-                                references_data: images ? images.map((i: string) => ({ length: i.length })) : [],
-                                result: data
-                              }]);
-                            }
-                            dbPayload = { messageId: assistantMsg?.id };
-                          }
-                        }
-                      } catch (dbErr) {
-                        console.error("❌ [LOCAL DB ERROR] Falha ao salvar no banco mockado:", dbErr);
-                      }
-
-                      return res.end(JSON.stringify({ ok: true, data, ...dbPayload }));
-                    } catch (err: any) {
-                      lastError = err;
-                      if (err.status === 404 || err.message.includes("not found")) continue;
+                      const model = genAI.getGenerativeModel({ model: modelName, generationConfig: { responseMimeType: "application/json" } });
+                      const result = await model.generateContent({ contents: [{ role: 'user', parts }] });
+                      data = JSON.parse(result.response.text());
                       break;
+                    } catch (err) {
+                      lastError = err;
+                      continue;
                     }
                   }
 
-                  throw lastError;
+                  if (!data) throw lastError;
+
+                  // Engine selection Mock
+                  const imgUrl = options?.engine === 'imagen'
+                    ? `https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200`
+                    : `https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&w=1080`;
+
+                  data.imageUrl = imgUrl;
+                  data.config.backgroundImage = imgUrl;
+                  if (data.config.layers) {
+                    data.config.layers = data.config.layers.map((l: any) => l.id === 'art' ? { ...l, content: imgUrl } : l);
+                  }
+
+                  // Persistência Mock
+                  if (conversationId && userId) {
+                    db.messages.push({
+                      id: Math.random().toString(36).substr(2, 9),
+                      conversation_id: conversationId,
+                      role: 'user',
+                      content: { text: prompt },
+                      created_at: new Date().toISOString()
+                    });
+                    db.messages.push({
+                      id: Math.random().toString(36).substr(2, 9),
+                      conversation_id: conversationId,
+                      role: 'assistant',
+                      content: data,
+                      created_at: new Date().toISOString()
+                    });
+                    const conv = db.conversations.find(c => c.id === conversationId);
+                    if (conv) conv.updated_at = new Date().toISOString();
+                  }
+
+                  res.end(JSON.stringify({ ok: true, data }));
                 } catch (e: any) {
-                  console.error("❌ ERRO LOCAL:", e.message);
                   res.statusCode = 500;
-                  res.end(JSON.stringify({ ok: false, error: { message: e.message } }));
+                  res.end(JSON.stringify({ ok: false, error: e.message }));
                 }
               });
               return;
             }
+
             next();
           });
         }

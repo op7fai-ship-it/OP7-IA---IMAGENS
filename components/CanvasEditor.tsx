@@ -22,6 +22,37 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
     const [resizingId, setResizingId] = useState<string | null>(null);
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
     const [snapLines, setSnapLines] = useState<{ x: number | null, y: number | null }>({ x: null, y: null });
+    const [sidebarTab, setSidebarTab] = useState<'props' | 'layers'>('props');
+    const [showTooltip, setShowTooltip] = useState(false);
+
+    // 🛡️ PANIC UNLOCK LOCAL
+    useEffect(() => {
+        const handleEsc = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                setSelectedLayerId(null);
+                setDraggingId(null);
+                setResizingId(null);
+            }
+        };
+        window.addEventListener('keydown', handleEsc);
+        return () => window.removeEventListener('keydown', handleEsc);
+    }, []);
+
+    const toggleLayerVisibility = (id: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setConfig(prev => ({
+            ...prev,
+            layers: prev.layers.map(l => l.id === id ? { ...l, visible: l.visible === false } : l)
+        }));
+    };
+
+    const toggleLayerLock = (id: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setConfig(prev => ({
+            ...prev,
+            layers: prev.layers.map(l => l.id === id ? { ...l, locked: !l.locked } : l)
+        }));
+    };
 
     const canvasRef = useRef<HTMLDivElement>(null);
 
@@ -109,8 +140,33 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
 
     const selectedLayer = config.layers.find(l => l.id === selectedLayerId);
 
+    // 🎯 AUTO-SELEÇÃO: Focar na imagem gerada assim que terminar
+    useEffect(() => {
+        if (status === GenerationStatus.SUCCESS && !selectedLayerId) {
+            const artLayer = config.layers.find(l => l.id === 'art');
+            if (artLayer) {
+                setSelectedLayerId(artLayer.id);
+                setShowTooltip(true);
+                setTimeout(() => setShowTooltip(false), 5000);
+            }
+        }
+    }, [status, config.layers]);
+
+    const isGenerating = status !== GenerationStatus.IDLE && status !== GenerationStatus.SUCCESS && status !== GenerationStatus.ERROR;
+
     return (
-        <div className="flex h-full w-full overflow-hidden bg-slate-100">
+        <div
+            className="flex h-full w-full overflow-hidden bg-slate-100 relative"
+            style={{ pointerEvents: isGenerating ? 'none' : 'auto' }}
+        >
+            {/* Tooltip Alert */}
+            {showTooltip && (
+                <div className="absolute top-24 left-1/2 -translate-x-1/2 bg-op7-navy text-white px-6 py-3 rounded-2xl shadow-2xl z-[110] animate-in slide-in-from-top-4 duration-500 flex items-center gap-3">
+                    <Sparkles className="text-op7-accent" size={18} />
+                    <p className="text-xs font-bold">Arraste para mover • Use cantos para redimensionar • Duplo clique para editar texto</p>
+                </div>
+            )}
+
             {/* Tool Sidebar */}
             <div className="w-16 bg-white border-r border-op7-border flex flex-col items-center py-6 gap-6 z-30">
                 <button className="p-3 text-op7-blue bg-op7-blue/10 rounded-xl"><MousePointer2 size={24} /></button>
@@ -124,17 +180,19 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
             {/* Main Canvas Area */}
             <div className="flex-1 relative flex flex-col items-center justify-center p-8 overflow-auto">
                 {/* Progress Bar (when generating) */}
-                {status !== GenerationStatus.SUCCESS && status !== GenerationStatus.IDLE && (
-                    <div className="absolute top-10 left-1/2 -translate-x-1/2 w-full max-w-md space-y-3 z-50">
-                        <div className="flex items-center justify-between text-[10px] font-black text-op7-navy uppercase tracking-widest">
-                            <span>{progress.step}</span>
-                            <span>{progress.percentage}%</span>
-                        </div>
-                        <div className="h-2 w-full bg-white/50 backdrop-blur-md rounded-full overflow-hidden border border-white">
-                            <div
-                                className="h-full bg-gradient-to-r from-op7-blue to-op7-accent transition-all duration-500"
-                                style={{ width: `${progress.percentage}%` }}
-                            />
+                {status !== GenerationStatus.SUCCESS && status !== GenerationStatus.IDLE && status !== GenerationStatus.ERROR && (
+                    <div className="absolute inset-0 bg-white/40 backdrop-blur-[2px] z-[100] flex items-center justify-center pointer-events-none">
+                        <div className="w-full max-w-md space-y-4 p-8 bg-white/90 rounded-3xl shadow-2xl border border-white pointer-events-auto">
+                            <div className="flex items-center justify-between text-[10px] font-black text-op7-navy uppercase tracking-widest">
+                                <span className="flex items-center gap-2"><div className="w-1.5 h-1.5 bg-op7-blue rounded-full animate-ping" /> {progress.step}</span>
+                                <span>{progress.percentage}%</span>
+                            </div>
+                            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                                <div
+                                    className="h-full bg-gradient-to-r from-op7-blue to-op7-accent transition-all duration-500"
+                                    style={{ width: `${progress.percentage}%` }}
+                                />
+                            </div>
                         </div>
                     </div>
                 )}
@@ -162,20 +220,24 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
 
                 {/* Canvas Container */}
                 <div
-                    className="relative bg-white shadow-[0_60px_100px_-20px_rgba(0,0,0,0.2)] transition-all duration-500 rounded-sm overflow-hidden select-none"
+                    className="relative bg-white shadow-[0_60px_100px_-20px_rgba(0,0,0,0.2)] transition-all duration-500 rounded-sm overflow-hidden"
                     style={{
                         width: '100%',
-                        maxWidth: `${Math.min(height, 800) * aspectRatio}px`,
-                        aspectRatio: `${aspectRatio}`
+                        maxWidth: `${Math.min(height, 800) * aspectRatio}px!important`,
+                        aspectRatio: `${aspectRatio}`,
+                        pointerEvents: (status === GenerationStatus.SUCCESS || status === GenerationStatus.IDLE) ? 'auto' : 'none'
                     }}
-                    onMouseDown={() => setSelectedLayerId(null)}
+                    onMouseDown={(e) => {
+                        if (e.target === e.currentTarget) setSelectedLayerId(null);
+                    }}
                 >
                     <div
                         ref={canvasRef}
                         className="w-full h-full relative overflow-hidden"
                     >
                         {/* Background */}
-                        <div className="absolute inset-0 bg-white">
+                        <div className={`absolute inset-0 bg-white ${selectedLayerId === 'background' ? 'ring-4 ring-inset ring-op7-blue/50' : ''}`}
+                            onMouseDown={(e) => { e.stopPropagation(); setSelectedLayerId('background'); }}>
                             {config.backgroundImage ? (
                                 <img src={config.backgroundImage} className="w-full h-full object-cover" crossOrigin="anonymous" />
                             ) : (
@@ -190,8 +252,8 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
                         </div>
 
                         {/* Smart Guides */}
-                        {snapLines.x !== null && <div className="absolute top-0 bottom-0 left-1/2 w-[1px] bg-op7-blue z-[100]" />}
-                        {snapLines.y !== null && <div className="absolute left-0 right-0 top-1/2 h-[1px] bg-op7-blue z-[100]" />}
+                        {snapLines.x !== null && <div className="absolute top-0 bottom-0 left-1/2 w-[1px] bg-op7-blue z-[100] pointer-events-none" />}
+                        {snapLines.y !== null && <div className="absolute left-0 right-0 top-1/2 h-[1px] bg-op7-blue z-[100] pointer-events-none" />}
 
                         {/* Layers */}
                         {config.layers.map(layer => {
@@ -208,7 +270,8 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
                                         width: `${layer.size.width}%`,
                                         transform: 'translate(-50%, -50%)',
                                         cursor: isSelected ? 'default' : 'move',
-                                        visibility: layer.visible ? 'visible' : 'hidden'
+                                        visibility: (layer.visible !== false) ? 'visible' : 'hidden',
+                                        pointerEvents: layer.locked ? 'none' : 'auto'
                                     }}
                                     onMouseDown={(e) => handleMouseDown(layer, e)}
                                 >
@@ -302,16 +365,67 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
             {/* Right Sidebar (Layers & Properties) */}
             <div className="w-72 bg-white border-l border-op7-border flex flex-col z-30">
                 <div className="flex border-b border-op7-border">
-                    <button className="flex-1 py-4 text-xs font-black uppercase tracking-widest text-op7-blue border-b-2 border-op7-blue flex items-center justify-center gap-2">
+                    <button
+                        onClick={() => setSidebarTab('props')}
+                        className={`flex-1 py-4 text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${sidebarTab === 'props' ? 'text-op7-blue border-b-2 border-op7-blue' : 'text-slate-400 hover:text-slate-600'}`}>
                         <Settings2 size={14} /> Propriedades
                     </button>
-                    <button className="flex-1 py-4 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 flex items-center justify-center gap-2">
+                    <button
+                        onClick={() => setSidebarTab('layers')}
+                        className={`flex-1 py-4 text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${sidebarTab === 'layers' ? 'text-op7-blue border-b-2 border-op7-blue' : 'text-slate-400 hover:text-slate-600'}`}>
                         <Layers size={14} /> Camadas
                     </button>
                 </div>
 
                 <div className="flex-1 overflow-auto p-6 space-y-8">
-                    {!selectedLayer ? (
+                    {sidebarTab === 'layers' ? (
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between mb-2">
+                                <h3 className="text-[10px] font-black text-op7-navy uppercase tracking-[0.2em]">Lista de Camadas</h3>
+                            </div>
+                            <div className="space-y-2">
+                                {config.layers.map(layer => (
+                                    <div
+                                        key={layer.id}
+                                        onClick={() => setSelectedLayerId(layer.id)}
+                                        className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${selectedLayerId === layer.id ? 'bg-op7-blue/5 border-op7-blue/30' : 'bg-slate-50 border-slate-100'}`}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 shadow-sm">
+                                                {layer.type === 'text' ? <Type size={14} /> : layer.type === 'button' ? <Send size={14} /> : <ImageIcon size={14} />}
+                                            </div>
+                                            <span className={`text-xs font-bold ${selectedLayerId === layer.id ? 'text-op7-blue' : 'text-op7-navy'}`}>{layer.name}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            <button
+                                                onClick={(e) => toggleLayerVisibility(layer.id, e)}
+                                                className={`p-1.5 transition-colors ${layer.visible !== false ? 'text-slate-400 hover:text-op7-blue' : 'text-slate-200'}`}
+                                            >
+                                                {layer.visible !== false ? <ImageIcon size={14} /> : <ImageIcon size={14} className="opacity-40" />}
+                                            </button>
+                                            <button
+                                                onClick={(e) => toggleLayerLock(layer.id, e)}
+                                                className={`p-1.5 transition-colors ${layer.locked ? 'text-op7-accent' : 'text-slate-400 hover:text-op7-blue'}`}
+                                            >
+                                                {layer.locked ? <Maximize2 size={14} /> : <Move size={14} />}
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                                <div
+                                    onClick={() => setSelectedLayerId('background')}
+                                    className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${selectedLayerId === 'background' ? 'bg-op7-blue/5 border-op7-blue/30' : 'bg-slate-50 border-slate-100'}`}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 shadow-sm">
+                                            <Sparkles size={14} />
+                                        </div>
+                                        <span className={`text-xs font-bold ${selectedLayerId === 'background' ? 'text-op7-blue' : 'text-op7-navy'}`}>Plano de Fundo</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ) : !selectedLayer && selectedLayerId !== 'background' ? (
                         <div className="space-y-6">
                             <div className="flex flex-col items-center justify-center text-slate-400 gap-2 mb-8 text-center bg-slate-50 p-4 rounded-xl border border-slate-100">
                                 <MousePointer2 size={24} className="opacity-50" />
