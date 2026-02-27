@@ -192,15 +192,26 @@ const App: React.FC = () => {
 
       const result = await generateCreative(prompt, images, { ...options, conversationId: currentConvId, userId }, (p) => setProgress(p));
 
-      const assistantMsg = { id: result.messageId || Date.now().toString(), role: 'assistant', content: result.config ? result : {} };
+      // Construir mensagem do assistente garantindo o config
+      const assistantMsg = {
+        id: result.messageId || `asst-${Date.now()}`,
+        role: 'assistant',
+        content: result.config ? result : { ...result, config: result.config || INITIAL_CONFIG }
+      };
+
       setMessages(prev => [...prev, assistantMsg]);
 
-      setConfig(result.config);
-      addToHistory(result.config);
-      setVersions(prev => [...prev, { id: `v${prev.length + 1}`, timestamp: Date.now(), config: result.config }]);
+      if (result.config) {
+        setConfig(result.config);
+        addToHistory(result.config);
+        setVersions(prev => [...prev, { id: `v${prev.length + 1}`, timestamp: Date.now(), config: result.config }]);
 
-      setStatus(GenerationStatus.SUCCESS);
-      setView('editor');
+        setStatus(GenerationStatus.SUCCESS);
+        // Pequeno timeout para garantir que os estados foram computados
+        setTimeout(() => setView('editor'), 100);
+      } else {
+        throw new Error("A IA não retornou uma configuração de design válida.");
+      }
     } catch (error: any) {
       console.error("🧨 [GERAÇÃO ABORTADA]", error);
       setStatus(GenerationStatus.ERROR);
@@ -220,25 +231,28 @@ const App: React.FC = () => {
         });
       }
     } finally {
-      // 🛡️ GARANTIA ABSOLUTA DE DESTRAVAMENTO
-      // Se não houver erro, garante status SUCCESS para fechar overlays no CanvasEditor
+      // Garantia de status final se não for erro
       setStatus(prev => (prev === GenerationStatus.ERROR ? GenerationStatus.ERROR : GenerationStatus.SUCCESS));
-
       setProgress({ step: 'Finalizado', percentage: 100 });
       console.log("🔓 [APP] UI reativada.");
     }
   };
 
   const loadPastGenerationEditor = async (messageId: string) => {
+    console.log("📂 Carregando arte passada:", messageId);
     try {
       const res = await fetch(`/api/messages?messageId=${messageId}`);
       const json = await res.json();
-      if (json.ok && json.data) {
+
+      if (json.ok && json.data && json.data.result) {
         const pastConfig = json.data.result.config;
         if (pastConfig) {
           setConfig(pastConfig);
           addToHistory(pastConfig);
           setView('editor');
+          console.log("✅ Arte restaurada!");
+        } else {
+          console.warn("Mensagem encontrada, mas sem 'config'.", json.data);
         }
       }
     } catch (err) {

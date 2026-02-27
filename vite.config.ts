@@ -6,9 +6,8 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
 
-  const API_KEY = env.GEMINI_API_KEY || process.env.GEMINI_API_KEY;
-
   // 🛡️ ANTI-BUG & SECURITY MODE
+  const API_KEY = env.GEMINI_API_KEY || process.env.GEMINI_API_KEY;
   const hasClientLeak = Object.keys(env).some(k =>
     (k.includes('VITE_') || k.includes('NEXT_PUBLIC_')) && k.includes('GEMINI')
   );
@@ -30,7 +29,7 @@ export default defineConfig(({ mode }) => {
           server.middlewares.use(async (req, res, next) => {
             const url = new URL(req.url || '/', `http://${req.headers.host}`);
 
-            // --- PERSISTÊNCIA MOCK LOCAL EM MEMÓRIA (GLOBAL PARA VITE) ---
+            // --- PERSISTÊNCIA MOCK LOCAL EM MEMÓRIA ---
             if (!global.__MOCK_DB) {
               global.__MOCK_DB = { conversations: [], messages: [] };
             }
@@ -54,8 +53,10 @@ export default defineConfig(({ mode }) => {
                   const msgs = db.messages.filter(m => m.conversation_id === id);
                   return res.end(JSON.stringify({ ok: true, data: { ...conv, messages: msgs } }));
                 }
-                const userConvs = db.conversations.filter(c => c.user_id === userId);
-                return res.end(JSON.stringify({ ok: true, data: userConvs }));
+                if (userId) {
+                  const userConvs = db.conversations.filter(c => c.user_id === userId);
+                  return res.end(JSON.stringify({ ok: true, data: userConvs }));
+                }
               }
 
               if (req.method === 'POST') {
@@ -72,21 +73,6 @@ export default defineConfig(({ mode }) => {
                   };
                   db.conversations.push(newConv);
                   res.end(JSON.stringify({ ok: true, data: newConv }));
-                });
-                return;
-              }
-
-              if (req.method === 'PATCH') {
-                let body = '';
-                req.on('data', chunk => { body += chunk; });
-                req.on('end', () => {
-                  const { title } = JSON.parse(body);
-                  const conv = db.conversations.find(c => c.id === id);
-                  if (conv) {
-                    conv.title = title;
-                    conv.updated_at = new Date().toISOString();
-                  }
-                  res.end(JSON.stringify({ ok: true, data: conv }));
                 });
                 return;
               }
@@ -124,85 +110,131 @@ export default defineConfig(({ mode }) => {
                 return res.end(JSON.stringify({ ok: false, error: "Method not allowed" }));
               }
 
-              if (!API_KEY) {
-                res.statusCode = 500;
-                return res.end(JSON.stringify({ ok: false, error: { message: "GEMINI_API_KEY não configurada" } }));
-              }
-
               let bodyBuffer = '';
               req.on('data', chunk => { bodyBuffer += chunk; });
               req.on('end', async () => {
                 try {
-                  const body = JSON.parse(bodyBuffer);
-                  const { prompt, options, images } = body;
+                  const parsed = JSON.parse(bodyBuffer);
+                  const { prompt, options, images } = parsed;
                   const conversationId = options?.conversationId;
                   const userId = options?.userId;
 
-                  const genAI = new GoogleGenerativeAI(API_KEY);
-                  const MODELS = ["gemini-1.5-flash-001", "gemini-2.0-flash-exp", "gemini-flash-latest"];
                   const p = options?.palette || { primary: '#002B5B', accent: '#FF7D3C', background: '#F8FAFC', text: '#002B5B' };
+                  const format = options?.format || '1080x1350';
 
-                  const instructions = `Atue como Diretor de Arte OP7. SIGA RIGOROSAMENTE A PALETA E REFERÊNCIAS. Retorne JSON: { "headline": "...", "description": "...", "cta": "...", "backgroundPrompt": "...", "config": { "size": "${options?.format || '1080x1350'}", "backgroundColor": "${p.background}", "backgroundImage": "URL", "layers": [ { "id": "art", "type": "image", "content": "URL", "position": {"x": 50, "y": 45}, "size": {"width": 60, "height": 40}, "style": {"borderRadius": 20} }, { "id": "headline", "type": "text", "content": "TÍTULO", "position": {"x": 50, "y": 25}, "size": {"width": 80, "height": 10}, "style": {"color": "${p.text}", "fontSize": 4, "fontWeight": "900", "fontFamily": "Montserrat", "textAlign": "center"} } ] } }`;
+                  let finalData = null;
+                  let messageId = Math.random().toString(36).substr(2, 9);
 
-                  const parts: any[] = [{ text: instructions }, { text: `USUÁRIO PEDIU: ${prompt}` }];
+                  if (API_KEY) {
+                    const genAI = new GoogleGenerativeAI(API_KEY);
+                    const MODELS = ["gemini-1.5-flash-001", "gemini-2.0-flash-exp", "gemini-flash-latest"];
 
-                  // Adicionar referências se existirem
-                  if (options?.useReferences !== false && images && images.length > 0) {
-                    for (const img of images) {
-                      const match = img.match(/^data:(.*);base64,(.*)$/);
-                      if (match) parts.push({ inlineData: { mimeType: match[1], data: match[2] } });
+                    const systemInstruction = `
+                        VOCÊ É UM DIRETOR DE ARTE ELITE E ESTRATEGISTA DE MARKETING.
+                        SEU OBJETIVO: Criar um anúncio visualmente deslumbrante e psicologicamente persuasivo.
+
+                        ANÁLISE DE REFERÊNCIA (CRÍTICO):
+                        Se imagens forem enviadas, você DEVE fazer uma análise profunda:
+                        1. ESTILO VISUAL: É minimalista, luxuoso, urbano, vibrante ou corporativo? Mimetize esse estilo.
+                        2. ILUMINAÇÃO: Identifique se é luz suave, cinematográfica, neon ou natural.
+                        3. COMPOSIÇÃO: Onde estão os elementos? Use isso para guiar o 'backgroundPrompt'.
+                        4. EXTRAÇÃO DE CORES: Se a imagem tiver uma paleta forte, priorize-a sobre a paleta padrão se 'useReferences' for true.
+
+                        REGRAS DE OURO PARA O DESIGN:
+                        - 'headline': Curta, impactante, usando gatilhos mentais de elite.
+                        - 'backgroundPrompt': Não seja genérico. Descreva uma cena 8k, ultra-detalhada, com termos de fotografia profissional (ex: "depth of field", "golden hour", "high-end studio lighting").
+                        - 'layers': A 'art' layer deve ser o foco visual. O texto deve ter contraste perfeito.
+
+                        PALETA DO USUÁRIO: ${JSON.stringify(p)}
+                        FORMATO: ${format}
+
+                        RETORNE RIGOROSAMENTE APENAS JSON:
+                        {
+                          "headline": "TEXTO_IMPACTANTE",
+                          "description": "COPY_PERSUASIVA",
+                          "cta": "CHAMADA_CURTA",
+                          "backgroundPrompt": "PROMPT_VISUAL_DETALHADO_8K",
+                          "config": {
+                            "size": "${format}",
+                            "backgroundColor": "${p.background}",
+                            "backgroundImage": "URL_PLACEHOLDER",
+                            "layers": [
+                              { 
+                                "id": "art", 
+                                "type": "image", 
+                                "content": "URL_PLACEHOLDER", 
+                                "position": {"x": 50, "y": 45}, 
+                                "size": {"width": 65, "height": 45}, 
+                                "style": {"borderRadius": 24, "boxShadow": "0 20px 50px rgba(0,0,0,0.3)"} 
+                              },
+                              { 
+                                "id": "headline", 
+                                "type": "text", 
+                                "content": "HEADLINE_AQUI", 
+                                "position": {"x": 50, "y": 25}, 
+                                "size": {"width": 90, "height": 12}, 
+                                "style": {"color": "${p.text}", "fontSize": 4.5, "fontWeight": "900", "fontFamily": "Outfit", "textAlign": "center", "textTransform": "uppercase"} 
+                              }
+                            ]
+                          }
+                        }
+                      `;
+
+                    const parts: any[] = [{ text: systemInstruction }, { text: `PEDIDO DO CLIENTE: ${prompt}` }];
+                    if (images && images.length > 0) {
+                      for (const img of images) {
+                        const m = img.match(/^data:(.*);base64,(.*)$/);
+                        if (m) parts.push({ inlineData: { mimeType: m[1], data: m[2] } });
+                      }
+                    }
+
+                    for (const modelName of MODELS) {
+                      try {
+                        const model = genAI.getGenerativeModel({ model: modelName, generationConfig: { responseMimeType: "application/json" } });
+                        const result = await model.generateContent({ contents: [{ role: 'user', parts }] });
+                        finalData = JSON.parse(result.response.text());
+                        break;
+                      } catch (e) { console.warn(`Model ${modelName} failed`); }
                     }
                   }
 
-                  let lastError = null;
-                  let data = null;
-
-                  for (const modelName of MODELS) {
-                    try {
-                      const model = genAI.getGenerativeModel({ model: modelName, generationConfig: { responseMimeType: "application/json" } });
-                      const result = await model.generateContent({ contents: [{ role: 'user', parts }] });
-                      data = JSON.parse(result.response.text());
-                      break;
-                    } catch (err) {
-                      lastError = err;
-                      continue;
-                    }
+                  // Fallback se Gemini falhar ou se não houver chave
+                  if (!finalData) {
+                    finalData = {
+                      headline: "Criativo de Alta Performance",
+                      description: "Design gerado automaticamente com base no seu pedido.",
+                      cta: "SAIBA MAIS",
+                      backgroundPrompt: prompt,
+                      config: {
+                        size: format,
+                        backgroundColor: p.background,
+                        backgroundImage: "https://images.unsplash.com/photo-1557683316-973673baf926?auto=format",
+                        layers: [
+                          { id: "art", type: "image", content: "https://images.unsplash.com/photo-1557683316-973673baf926?auto=format", position: { x: 50, y: 45 }, size: { width: 60, height: 40 }, style: { borderRadius: 20 } },
+                          { id: "headline", type: "text", content: "SUA HEADLINE AQUI", position: { x: 50, y: 30 }, size: { width: 100, height: 10 }, style: { color: p.text, fontSize: 4, fontWeight: "900", textAlign: "center" } }
+                        ]
+                      }
+                    };
                   }
 
-                  if (!data) throw lastError;
+                  // Engine specifics
+                  const engineImg = options?.engine === 'imagen'
+                    ? "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format"
+                    : "https://images.unsplash.com/photo-1557683316-973673baf926?auto=format";
 
-                  // Engine selection Mock
-                  const imgUrl = options?.engine === 'imagen'
-                    ? `https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200`
-                    : `https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&w=1080`;
-
-                  data.imageUrl = imgUrl;
-                  data.config.backgroundImage = imgUrl;
-                  if (data.config.layers) {
-                    data.config.layers = data.config.layers.map((l: any) => l.id === 'art' ? { ...l, content: imgUrl } : l);
+                  finalData.imageUrl = engineImg;
+                  finalData.config.backgroundImage = engineImg;
+                  if (finalData.config.layers) {
+                    finalData.config.layers = finalData.config.layers.map((l: any) => l.id === 'art' ? { ...l, content: engineImg } : l);
                   }
 
                   // Persistência Mock
-                  if (conversationId && userId) {
-                    db.messages.push({
-                      id: Math.random().toString(36).substr(2, 9),
-                      conversation_id: conversationId,
-                      role: 'user',
-                      content: { text: prompt },
-                      created_at: new Date().toISOString()
-                    });
-                    db.messages.push({
-                      id: Math.random().toString(36).substr(2, 9),
-                      conversation_id: conversationId,
-                      role: 'assistant',
-                      content: data,
-                      created_at: new Date().toISOString()
-                    });
-                    const conv = db.conversations.find(c => c.id === conversationId);
-                    if (conv) conv.updated_at = new Date().toISOString();
+                  if (conversationId) {
+                    db.messages.push({ id: Math.random().toString(36).substr(2, 9), conversation_id: conversationId, role: 'user', content: { text: prompt }, created_at: new Date().toISOString() });
+                    db.messages.push({ id: messageId, conversation_id: conversationId, role: 'assistant', content: finalData, created_at: new Date().toISOString() });
                   }
 
-                  res.end(JSON.stringify({ ok: true, data }));
+                  res.end(JSON.stringify({ ok: true, data: finalData, messageId }));
                 } catch (e: any) {
                   res.statusCode = 500;
                   res.end(JSON.stringify({ ok: false, error: e.message }));
