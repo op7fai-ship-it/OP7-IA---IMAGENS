@@ -139,7 +139,8 @@ export default async function handler(req: any, res: any) {
               .jpeg({ quality: 80 })
               .toBuffer();
             parts.push({ inlineData: { mimeType: 'image/jpeg', data: compressedBuffer.toString('base64') } });
-          } catch (e) {
+          } catch (sharpError) {
+            console.warn("⚠️ SHARP FAIL (fallback to base64):", sharpError);
             parts.push({ inlineData: { mimeType, data: base64Data } });
           }
         }
