@@ -417,7 +417,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
                         </div>
                     ) : selectedLayerId ? (
                         <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
-                            <DiagnosticProps layer={config.layers.find(l => l.id === selectedLayerId)!} setConfig={setConfig} isBackground={selectedLayerId === 'background'} />
+                            <DiagnosticProps layer={config?.layers?.find(l => l.id === selectedLayerId) || (null as any)} setConfig={setConfig} isBackground={selectedLayerId === 'background'} />
                         </div>
                     ) : (
                         <div className="flex flex-col items-center justify-center py-20 text-center gap-4">

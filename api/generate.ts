@@ -17,18 +17,18 @@ export default async function handler(req: any, res: any) {
 
     const API_KEY = requireEnv();
     if (!API_KEY) {
-      return res.status(500).json(toErrorResponse("ENV_MISSING", "GEMINI_API_KEY não configurada no backend."));
+      return res.status(500).json({ ok: false, error: "GEMINI_API_KEY não configurada no backend." });
     }
 
     if (req.method !== 'POST') {
-      return res.status(405).json(toErrorResponse("METHOD_NOT_ALLOWED", "Apenas POST permitido"));
+      return res.status(405).json({ ok: false, error: "Apenas POST permitido" });
     }
 
     const { prompt, format, images, options } = req.body;
     console.log("BODY RECEIVED");
 
     if (!prompt || prompt.trim() === '') {
-      return res.status(400).json(toErrorResponse("INVALID_PROMPT", "O prompt não pode estar vazio."));
+      return res.status(400).json({ ok: false, error: "O prompt não pode estar vazio." });
     }
 
     const genAI = new GoogleGenerativeAI(API_KEY);
@@ -177,7 +177,7 @@ export default async function handler(req: any, res: any) {
     }
 
     if (!data) {
-      return res.status(500).json(toErrorResponse("AI_GENERATION_FAILED", "Falha ao gerar na IA.", lastError?.message));
+      return res.status(500).json({ ok: false, error: `Falha ao gerar na IA: ${lastError?.message || 'Erro desconhecido'}` });
     }
 
     // --- ENGINE / IMAGE HANDLING ---
