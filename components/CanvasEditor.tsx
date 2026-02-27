@@ -128,7 +128,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
                     ...prev,
                     layers: prev.layers.map(l => l.id === resizingId ? {
                         ...l,
-                        size: { ...l.size, width: Math.max(5, dist) }
+                        size: { ...(l?.size || {}), width: Math.max(5, dist) }
                     } : l)
                 }));
             }
@@ -446,11 +446,11 @@ const DiagnosticProps: React.FC<{ layer: Layer; setConfig: any; isBackground?: b
                 <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
                         <label className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Posição X</label>
-                        <input type="number" value={Math.round(layer?.position?.x || 0)} onChange={(e) => setConfig((p: any) => ({ ...p, layers: p.layers.map((l: any) => l.id === layer?.id ? { ...l, position: { ...l.position, x: parseInt(e.target.value) } } : l) }))} className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-xs font-black" />
+                        <input type="number" value={Math.round(layer?.position?.x || 0)} onChange={(e) => setConfig((p: any) => ({ ...p, layers: p?.layers?.map((l: any) => l.id === layer?.id ? { ...l, position: { ...(l?.position || {}), x: parseInt(e.target.value) } } : l) }))} className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-xs font-black" />
                     </div>
                     <div className="space-y-1.5">
                         <label className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Posição Y</label>
-                        <input type="number" value={Math.round(layer?.position?.y || 0)} onChange={(e) => setConfig((p: any) => ({ ...p, layers: p.layers.map((l: any) => l.id === layer?.id ? { ...l, position: { ...l.position, y: parseInt(e.target.value) } } : l) }))} className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-xs font-black" />
+                        <input type="number" value={Math.round(layer?.position?.y || 0)} onChange={(e) => setConfig((p: any) => ({ ...p, layers: p?.layers?.map((l: any) => l.id === layer?.id ? { ...l, position: { ...(l?.position || {}), y: parseInt(e.target.value) } } : l) }))} className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-xs font-black" />
                     </div>
                 </div>
             </div>
@@ -472,7 +472,7 @@ const DiagnosticProps: React.FC<{ layer: Layer; setConfig: any; isBackground?: b
                                 <label className="text-[9px] font-bold text-slate-400 uppercase">Tipografia</label>
                                 <select
                                     value={layer?.style?.fontFamily || 'Montserrat'}
-                                    onChange={(e) => setConfig((p: any) => ({ ...p, layers: p.layers.map((l: any) => l.id === layer?.id ? { ...l, style: { ...l.style, fontFamily: e.target.value } } : l) }))}
+                                    onChange={(e) => setConfig((p: any) => ({ ...p, layers: p?.layers?.map((l: any) => l.id === layer?.id ? { ...l, style: { ...(l?.style || {}), fontFamily: e.target.value } } : l) }))}
                                     className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-xs font-black"
                                 >
                                     <option value="Montserrat">Montserrat</option>
