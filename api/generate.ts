@@ -6,7 +6,7 @@ import { toErrorResponse } from "../lib/api/error";
 // 🚀 ANTI-BUG: Rota imutável. UI depende de /api/generate
 export const runtime = 'nodejs';
 
-const MODELS = ["gemini-1.5-flash-001", "gemini-flash-latest"];
+const MODELS = ["gemini-2.0-flash-exp", "gemini-1.5-flash-001", "gemini-flash-latest"];
 const IMAGEN_MODEL = "imagen-3.0-generate-001";
 
 export default async function handler(req: any, res: any) {
@@ -43,78 +43,27 @@ export default async function handler(req: any, res: any) {
     };
 
     const systemPrompt = `
-      Você é um Especialista em Design e Copywriting de Alta Performance.
-      
-      OBJETIVO:
-      Criar um anúncio visual e textual que siga RIGOROSAMENTE as preferências do usuário.
-      VOCÊ NÃO ESTÁ PRESO A UM ESTILO ÚNICO. Se o usuário mandar uma paleta ou referência, ELA É A LEI.
+      VOCÊ É UM DIRETOR DE ARTE ELITE.
+      SEU OBJETIVO: Criar um anúncio visualmente deslumbrante e persuasivo.
 
       REGRAS CRÍTICAS:
-      1. FIDELIDADE COR/ESTILO: Use exatamente a paleta de cores fornecida abaixo. Se o usuário enviar imagens de referência, analise o estilo visual, cores e composição dessas imagens para guiar a criação.
-      2. BACKGROUND: O 'backgroundPrompt' deve ser uma descrição detalhada para IA de imagem que reflita o tema pedido pelo usuário.
-      3. TEXTOS: Título e descrição devem ser persuasivos, curtos e diretos ao ponto.
-      
-      PALETA DE CORES FORNECIDA PELO USUÁRIO (OBRIGATÓRIO USAR):
-      - Primária: ${paletteObj.primary}
-      - Secundária: ${paletteObj.secondary}
-      - Fundo: ${paletteObj.background}
-      - Texto Principal: ${paletteObj.text}
-      - Destaque/CTA: ${paletteObj.accent}
-
-      REFERÊNCIAS VISUAIS:
-      Se imagens forem enviadas, extraia o "feeling" delas. Se for algo luxuoso, use termos de luxo. Se for urbano, use termos urbanos.
+      1. FIDELIDADE COR/ESTILO: Use a paleta: ${JSON.stringify(paletteObj)}.
+      2. BACKGROUND: O 'backgroundPrompt' deve ser uma descrição detalhada 8k.
       
       FORMATO: ${format || options?.format || '1080x1350'}
 
-      RETORNE APENAS JSON NESTE FORMATO:
+      RETORNE RIGOROSAMENTE APENAS JSON:
       {
-        "headline": "Título curto e impactante (Ex: 'Recupere sua Autoestima')",
-        "description": "Texto de apoio persuasivo (Ex: 'Tratamentos exclusivos com tecnologia de ponta')",
-        "cta": "Chamada para ação curta (Ex: 'AGENDAR AGORA')",
-        "backgroundPrompt": "Descrição visual DETALHADA para o motor de imagem. (Ex: 'Luxury aesthetic clinic interior, clean white walls, golden accents, soft lighting, professional ambiance, 8k resolution')",
+        "headline": "Título curto",
+        "description": "Texto persuasivo",
+        "cta": "Botão",
+        "backgroundPrompt": "Descrição visual 8k",
         "config": {
           "size": "${format || options?.format || '1080x1350'}",
           "backgroundColor": "${paletteObj.background}",
-          "backgroundImage": "URL_PLACEHOLDER",
-          "overlayOpacity": 0.25,
-          "overlayColor": "#000000",
           "layers": [
-            {
-              "id": "art",
-              "type": "image",
-              "name": "Arte Principal",
-              "content": "URL_PLACEHOLDER",
-              "position": {"x": 50, "y": 45},
-              "size": {"width": 60, "height": 40},
-              "style": { "borderRadius": 20, "rotate": 0 }
-            },
-            {
-              "id": "headline",
-              "type": "text",
-              "name": "Título",
-              "content": "MESMA HEADLINE ACIMA",
-              "position": {"x": 50, "y": 30},
-              "size": {"width": 80, "height": 10},
-              "style": { "color": "${paletteObj.text}", "fontSize": 4, "fontWeight": "900", "fontFamily": "Montserrat", "textAlign": "center", "textTransform": "uppercase" }
-            },
-            {
-              "id": "subheadline",
-              "type": "text",
-              "name": "Descrição",
-              "content": "MESMA DESCRIPTION ACIMA",
-              "position": {"x": 50, "y": 55},
-              "size": {"width": 75, "height": 15},
-              "style": { "color": "${paletteObj.secondary}", "fontSize": 1.8, "fontWeight": "500", "fontFamily": "Outfit", "textAlign": "center" }
-            },
-            {
-              "id": "cta",
-              "type": "button",
-              "name": "Botão",
-              "content": "MESMO CTA ACIMA",
-              "position": {"x": 50, "y": 82},
-              "size": {"width": 45, "height": 8},
-              "style": { "color": "#FFFFFF", "backgroundColor": "${paletteObj.accent}", "fontSize": 1.4, "fontWeight": "900", "fontFamily": "Montserrat", "borderRadius": 50, "padding": 20 }
-            }
+            { "id": "art", "type": "image", "content": "PLACEHOLDER", "position": {"x": 50, "y": 45}, "size": {"width": 65, "height": 45}, "style": {"borderRadius": 24} },
+            { "id": "headline", "type": "text", "content": "HEADLINE", "position": {"x": 50, "y": 25}, "size": {"width": 90, "height": 12}, "style": {"color": "${paletteObj.text}", "fontSize": 4.5, "fontWeight": "900", "textAlign": "center"} }
           ]
         }
       }
@@ -122,7 +71,6 @@ export default async function handler(req: any, res: any) {
 
     const parts: any[] = [{ text: systemPrompt }, { text: `USUÁRIO PEDIU: ${prompt}` }];
 
-    // ... (logic for image references compression remains the same)
     if (options?.useReferences !== false && images && images.length > 0) {
       for (const img of images) {
         const match = img.match(/^data:(.*);base64,(.*)$/);
@@ -144,20 +92,31 @@ export default async function handler(req: any, res: any) {
     }
 
     let lastError = null;
-    let data = null;
+    let data: any = null;
 
     for (const modelName of MODELS) {
       try {
-        console.log(`🤖[BACKEND] using model: ${modelName}`);
-        console.log("CALLING GEMINI");
+        console.log(`🤖[BACKEND] trying model: ${modelName}`);
         const model = genAI.getGenerativeModel({ model: modelName, generationConfig: { responseMimeType: "application/json" } });
         const result = await model.generateContent({ contents: [{ role: 'user', parts }] });
-        data = JSON.parse(result.response.text());
+        const response = result.response;
+        data = JSON.parse(response.text());
+
+        // Check for multimodal image output
+        const imagePart = response.candidates[0]?.content?.parts?.find((p: any) => p.inlineData);
+        if (imagePart) {
+          console.log("📸 [BACKEND] Image found in Gemini output!");
+          data.image = {
+            kind: 'base64',
+            base64: `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`,
+            mimeType: imagePart.inlineData.mimeType
+          };
+        }
         break;
       } catch (error: any) {
         lastError = error;
-        if (error.status === 404) continue;
-        break;
+        console.warn(`Model ${modelName} failed:`, error.message);
+        continue;
       }
     }
 
@@ -165,62 +124,37 @@ export default async function handler(req: any, res: any) {
       return res.status(500).json(toErrorResponse("AI_GENERATION_FAILED", "Falha ao gerar na IA.", lastError?.message));
     }
 
-    // --- ENGINE SELECTION ---
-    if (engine === 'imagen') {
-      try {
-        console.log(`🎨 [BACKEND] Using IMAGEN engine for high-quality generation...`);
-        // Aqui seria a chamada real ao Imagen 3.0 via REST
-        // data.imageUrl = await generateImagen(API_KEY, data.backgroundPrompt);
+    // --- ENGINE / IMAGE HANDLING ---
+    if (!data.image) {
+      const engineImg = engine === 'imagen'
+        ? `https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format`
+        : `https://images.unsplash.com/photo-1557683316-973673baf926?auto=format`;
 
-        // PLACEHOLDER PREMIUM PARA IMAGEN
-        data.imageUrl = `https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2000&auto=format&fit=crop`;
-      } catch (err) {
-        console.error("❌ IMAGEN ENGINE ERROR:", err);
-      }
-    } else {
-      // Nano Banana mode (Unsplash Placeholder)
-      data.imageUrl = `https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&w=1080&q=80`;
+      data.image = { kind: 'url', url: engineImg, mimeType: 'image/jpeg' };
     }
 
-    // Aplicar URL gerada no fundo e na camada de arte se existirem placeholders
+    const finalImgSrc = data.image.kind === 'base64' ? data.image.base64 : data.image.url;
+    data.imageUrl = finalImgSrc;
+
     if (data.config) {
-      data.config.backgroundImage = data.imageUrl;
+      data.config.backgroundImage = finalImgSrc;
       if (data.config.layers) {
         data.config.layers = data.config.layers.map((l: any) =>
-          l.id === 'art' ? { ...l, content: data.imageUrl } : l
+          l.type === 'image' ? { ...l, content: finalImgSrc } : l
         );
       }
     }
 
-    console.log("RETURN SUCCESS");
-
-    // --- DB SYNC (Supabase) ---
-    let dbPayload = {};
+    // --- DB SYNC ---
     const { conversationId, userId } = req.body;
+    let dbPayload = {};
     if (conversationId && userId) {
       try {
         const { supabase } = await import('./lib/supabase');
-
-        const { data: userMessage } = await supabase
-          .from('messages')
-          .insert([{ conversation_id: conversationId, user_id: userId, role: 'user', content: { text: prompt } }])
-          .select().single();
-
         const { data: assistantMessage } = await supabase
           .from('messages')
           .insert([{ conversation_id: conversationId, user_id: userId, role: 'assistant', content: data }])
           .select().single();
-
-        if (userMessage && assistantMessage) {
-          await supabase.from('generations').insert([{
-            conversation_id: conversationId,
-            message_id: assistantMessage.id,
-            prompt: prompt,
-            palette: paletteObj,
-            references_data: images ? images.map((i: string) => ({ length: i.length })) : [],
-            result: data
-          }]);
-        }
         dbPayload = { messageId: assistantMessage?.id };
       } catch (dbErr) {
         console.warn("DB SYNC ERROR:", dbErr);

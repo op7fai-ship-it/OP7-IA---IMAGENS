@@ -62,8 +62,9 @@ export interface DesignConfig {
   backgroundImage: string | null;
   overlayOpacity: number;
   overlayColor: string;
-  palette?: ColorPalette; // Added palette to the saved config state
+  palette?: ColorPalette;
   layers: Layer[];
+  generationId?: string; // Track unique generation for cache busting
 }
 
 export interface ChatMessage {

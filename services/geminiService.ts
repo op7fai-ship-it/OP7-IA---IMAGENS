@@ -8,6 +8,14 @@ export interface CreativeResponse {
   config: DesignConfig;
   imageUrl?: string;
   messageId?: string;
+  data?: {
+    image?: {
+      kind: 'url' | 'base64';
+      url?: string;
+      base64?: string;
+      mimeType: string;
+    }
+  };
 }
 
 export const generateCreative = async (

@@ -63,16 +63,21 @@ export default defineConfig(({ mode }) => {
                 let body = '';
                 req.on('data', chunk => { body += chunk; });
                 req.on('end', () => {
-                  const { user_id, title } = JSON.parse(body);
-                  const newConv = {
-                    id: Math.random().toString(36).substr(2, 9),
-                    user_id,
-                    title: title || 'Nova Arte',
-                    created_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
-                  };
-                  db.conversations.push(newConv);
-                  res.end(JSON.stringify({ ok: true, data: newConv }));
+                  try {
+                    const { user_id, title } = JSON.parse(body);
+                    const newConv = {
+                      id: Math.random().toString(36).substr(2, 9),
+                      user_id,
+                      title: title || 'Nova Arte',
+                      created_at: new Date().toISOString(),
+                      updated_at: new Date().toISOString()
+                    };
+                    db.conversations.push(newConv);
+                    res.end(JSON.stringify({ ok: true, data: newConv }));
+                  } catch (e) {
+                    res.statusCode = 400;
+                    res.end(JSON.stringify({ ok: false, error: "Invalid JSON" }));
+                  }
                 });
                 return;
               }
@@ -130,24 +135,7 @@ export default defineConfig(({ mode }) => {
                     const MODELS = ["gemini-1.5-flash-001", "gemini-2.0-flash-exp", "gemini-flash-latest"];
 
                     const systemInstruction = `
-                        VOCÊ É UM DIRETOR DE ARTE ELITE E ESTRATEGISTA DE MARKETING.
-                        SEU OBJETIVO: Criar um anúncio visualmente deslumbrante e psicologicamente persuasivo.
-
-                        ANÁLISE DE REFERÊNCIA (CRÍTICO):
-                        Se imagens forem enviadas, você DEVE fazer uma análise profunda:
-                        1. ESTILO VISUAL: É minimalista, luxuoso, urbano, vibrante ou corporativo? Mimetize esse estilo.
-                        2. ILUMINAÇÃO: Identifique se é luz suave, cinematográfica, neon ou natural.
-                        3. COMPOSIÇÃO: Onde estão os elementos? Use isso para guiar o 'backgroundPrompt'.
-                        4. EXTRAÇÃO DE CORES: Se a imagem tiver uma paleta forte, priorize-a sobre a paleta padrão se 'useReferences' for true.
-
-                        REGRAS DE OURO PARA O DESIGN:
-                        - 'headline': Curta, impactante, usando gatilhos mentais de elite.
-                        - 'backgroundPrompt': Não seja genérico. Descreva uma cena 8k, ultra-detalhada, com termos de fotografia profissional (ex: "depth of field", "golden hour", "high-end studio lighting").
-                        - 'layers': A 'art' layer deve ser o foco visual. O texto deve ter contraste perfeito.
-
-                        PALETA DO USUÁRIO: ${JSON.stringify(p)}
-                        FORMATO: ${format}
-
+                        VOCÊ É UM DIRETOR DE ARTE ELITE.
                         RETORNE RIGOROSAMENTE APENAS JSON:
                         {
                           "headline": "TEXTO_IMPACTANTE",
@@ -157,20 +145,20 @@ export default defineConfig(({ mode }) => {
                           "config": {
                             "size": "${format}",
                             "backgroundColor": "${p.background}",
-                            "backgroundImage": "URL_PLACEHOLDER",
+                            "backgroundImage": "PLACEHOLDER",
                             "layers": [
                               { 
                                 "id": "art", 
                                 "type": "image", 
-                                "content": "URL_PLACEHOLDER", 
+                                "content": "PLACEHOLDER", 
                                 "position": {"x": 50, "y": 45}, 
                                 "size": {"width": 65, "height": 45}, 
-                                "style": {"borderRadius": 24, "boxShadow": "0 20px 50px rgba(0,0,0,0.3)"} 
+                                "style": {"borderRadius": 24} 
                               },
                               { 
                                 "id": "headline", 
                                 "type": "text", 
-                                "content": "HEADLINE_AQUI", 
+                                "content": "HEADLINE", 
                                 "position": {"x": 50, "y": 25}, 
                                 "size": {"width": 90, "height": 12}, 
                                 "style": {"color": "${p.text}", "fontSize": 4.5, "fontWeight": "900", "fontFamily": "Outfit", "textAlign": "center", "textTransform": "uppercase"} 
@@ -190,42 +178,64 @@ export default defineConfig(({ mode }) => {
 
                     for (const modelName of MODELS) {
                       try {
+                        console.log(`🤖 [MOCK-API] Using model: ${modelName}`);
                         const model = genAI.getGenerativeModel({ model: modelName, generationConfig: { responseMimeType: "application/json" } });
                         const result = await model.generateContent({ contents: [{ role: 'user', parts }] });
-                        finalData = JSON.parse(result.response.text());
+                        const response = result.response;
+                        const text = response.text();
+                        finalData = JSON.parse(text);
+
+                        // Procurar por imagem no response (multimodal output se suportado)
+                        const imagePart = response.candidates[0]?.content?.parts?.find(p => p.inlineData);
+                        if (imagePart) {
+                          console.log("📸 [MOCK-API] Image found in response!");
+                          finalData.image = {
+                            kind: 'base64',
+                            base64: `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`,
+                            mimeType: imagePart.inlineData.mimeType
+                          };
+                        }
                         break;
-                      } catch (e) { console.warn(`Model ${modelName} failed`); }
+                      } catch (e) {
+                        console.warn(`Model ${modelName} failed or returned invalid JSON.`, e.message);
+                      }
                     }
                   }
 
-                  // Fallback se Gemini falhar ou se não houver chave
-                  if (!finalData) {
-                    finalData = {
-                      headline: "Criativo de Alta Performance",
-                      description: "Design gerado automaticamente com base no seu pedido.",
-                      cta: "SAIBA MAIS",
-                      backgroundPrompt: prompt,
-                      config: {
-                        size: format,
-                        backgroundColor: p.background,
-                        backgroundImage: "https://images.unsplash.com/photo-1557683316-973673baf926?auto=format",
-                        layers: [
-                          { id: "art", type: "image", content: "https://images.unsplash.com/photo-1557683316-973673baf926?auto=format", position: { x: 50, y: 45 }, size: { width: 60, height: 40 }, style: { borderRadius: 20 } },
-                          { id: "headline", type: "text", content: "SUA HEADLINE AQUI", position: { x: 50, y: 30 }, size: { width: 100, height: 10 }, style: { color: p.text, fontSize: 4, fontWeight: "900", textAlign: "center" } }
-                        ]
-                      }
-                    };
+                  // Fallback & Standardization
+                  if (!finalData || !finalData.image) {
+                    const engineImg = options?.engine === 'imagen'
+                      ? "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format"
+                      : "https://images.unsplash.com/photo-1557683316-973673baf926?auto=format";
+
+                    if (!finalData) {
+                      finalData = {
+                        headline: "Criativo de Performance",
+                        description: "Design gerado automaticamente com base no seu pedido.",
+                        cta: "SAIBA MAIS",
+                        backgroundPrompt: prompt,
+                        config: {
+                          size: format,
+                          backgroundColor: p.background,
+                          layers: [
+                            { id: "art", type: "image", content: engineImg, position: { x: 50, y: 45 }, size: { width: 60, height: 40 }, style: { borderRadius: 24 } },
+                            { id: "headline", type: "text", content: "SUA HEADLINE", position: { x: 50, y: 25 }, size: { width: 90, height: 10 }, style: { color: p.text, fontSize: 4, fontWeight: "900", textAlign: "center" } }
+                          ]
+                        }
+                      };
+                    }
+
+                    finalData.image = { kind: 'url', url: engineImg, mimeType: 'image/jpeg' };
                   }
 
-                  // Engine specifics
-                  const engineImg = options?.engine === 'imagen'
-                    ? "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format"
-                    : "https://images.unsplash.com/photo-1557683316-973673baf926?auto=format";
-
-                  finalData.imageUrl = engineImg;
-                  finalData.config.backgroundImage = engineImg;
+                  // Apply image to config
+                  const finalImgSrc = finalData.image.kind === 'base64' ? finalData.image.base64 : finalData.image.url;
+                  finalData.imageUrl = finalImgSrc;
+                  finalData.config.backgroundImage = finalImgSrc;
                   if (finalData.config.layers) {
-                    finalData.config.layers = finalData.config.layers.map((l: any) => l.id === 'art' ? { ...l, content: engineImg } : l);
+                    finalData.config.layers = finalData.config.layers.map((l: any) =>
+                      l.type === 'image' ? { ...l, content: finalImgSrc } : l
+                    );
                   }
 
                   // Persistência Mock
@@ -236,6 +246,7 @@ export default defineConfig(({ mode }) => {
 
                   res.end(JSON.stringify({ ok: true, data: finalData, messageId }));
                 } catch (e: any) {
+                  console.error("💥 [MOCK-API ERROR]:", e);
                   res.statusCode = 500;
                   res.end(JSON.stringify({ ok: false, error: e.message }));
                 }

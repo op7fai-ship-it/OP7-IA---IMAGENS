@@ -70,6 +70,18 @@ export const ChatStream: React.FC<ChatStreamProps> = ({ messages, onOpenEditor, 
                                             >
                                                 <Edit size={16} /> Abrir no Editor VisuaI
                                             </button>
+
+                                            {/* Debug Instrumentation (Subtle) */}
+                                            <div className="mt-4 flex flex-wrap gap-2 opacity-30 hover:opacity-100 transition-opacity">
+                                                <span className="text-[8px] font-mono text-slate-400">
+                                                    ID: {msg.id.substring(0, 6)}
+                                                </span>
+                                                {msg.content?.image && (
+                                                    <span className="text-[8px] font-mono text-slate-400">
+                                                        TYPE: {msg.content.image.kind} | {msg.content.image.mimeType}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                     )}
                                 </div>

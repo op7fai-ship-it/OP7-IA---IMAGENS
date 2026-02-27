@@ -192,22 +192,44 @@ const App: React.FC = () => {
 
       const result = await generateCreative(prompt, images, { ...options, conversationId: currentConvId, userId }, (p) => setProgress(p));
 
+      // Process result image for frontend performance
+      const processedResult = { ...result };
+      if (processedResult.data?.image?.kind === 'base64') {
+        try {
+          const { base64ToBlob } = await import('./lib/image');
+          const blob = base64ToBlob(processedResult.data.image.base64, processedResult.data.image.mimeType);
+          const objectUrl = URL.createObjectURL(blob);
+          processedResult.config.backgroundImage = objectUrl;
+          processedResult.imageUrl = objectUrl;
+          if (processedResult.config.layers) {
+            processedResult.config.layers = processedResult.config.layers.map((l: any) =>
+              l.type === 'image' ? { ...l, content: objectUrl } : l
+            );
+          }
+        } catch (err) {
+          console.error("Erro ao converter base64 para ObjectURL:", err);
+        }
+      }
+
       // Construir mensagem do assistente garantindo o config
       const assistantMsg = {
         id: result.messageId || `asst-${Date.now()}`,
         role: 'assistant',
-        content: result.config ? result : { ...result, config: result.config || INITIAL_CONFIG }
+        content: processedResult.config ? processedResult : { ...processedResult, config: processedResult.config || INITIAL_CONFIG }
       };
 
       setMessages(prev => [...prev, assistantMsg]);
 
-      if (result.config) {
-        setConfig(result.config);
-        addToHistory(result.config);
-        setVersions(prev => [...prev, { id: `v${prev.length + 1}`, timestamp: Date.now(), config: result.config }]);
+      if (processedResult.config) {
+        // Force refresh key to prevent canvas caching
+        const generationId = result.messageId || Date.now().toString();
+        processedResult.config.generationId = generationId;
+
+        setConfig(processedResult.config);
+        addToHistory(processedResult.config);
+        setVersions(prev => [...prev, { id: `v${prev.length + 1}`, timestamp: Date.now(), config: processedResult.config }]);
 
         setStatus(GenerationStatus.SUCCESS);
-        // Pequeno timeout para garantir que os estados foram computados
         setTimeout(() => setView('editor'), 100);
       } else {
         throw new Error("A IA não retornou uma configuração de design válida.");

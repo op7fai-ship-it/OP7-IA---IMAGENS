@@ -239,7 +239,16 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
                         <div className={`absolute inset-0 bg-white ${selectedLayerId === 'background' ? 'ring-4 ring-inset ring-op7-blue/50' : ''}`}
                             onMouseDown={(e) => { e.stopPropagation(); setSelectedLayerId('background'); }}>
                             {config.backgroundImage ? (
-                                <img src={config.backgroundImage} className="w-full h-full object-cover" crossOrigin="anonymous" />
+                                <img
+                                    key={config.generationId || 'bg'}
+                                    src={config.backgroundImage}
+                                    className="w-full h-full object-cover"
+                                    crossOrigin="anonymous"
+                                    onError={(e) => {
+                                        console.error("Erro ao carregar backgroundImage. Atribuindo fallback...");
+                                        e.currentTarget.src = 'https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&w=1080&q=80';
+                                    }}
+                                />
                             ) : (
                                 <div className="w-full h-full bg-gradient-to-br from-slate-50 to-slate-200 flex items-center justify-center">
                                     <Sparkles className="text-slate-300" size={100} />
@@ -337,7 +346,15 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
                                         )}
 
                                         {layer.type === 'image' && (
-                                            <img src={layer.content} className="w-full h-auto pointer-events-none" />
+                                            <img
+                                                key={`${layer.id}-${config.generationId || ''}`}
+                                                src={layer.content}
+                                                className="w-full h-auto pointer-events-none"
+                                                onError={(e) => {
+                                                    console.error(`Erro ao carregar layer ${layer.id}. Atribuindo fallback...`);
+                                                    e.currentTarget.src = 'https://images.unsplash.com/photo-1557683316-973673baf926?auto=format';
+                                                }}
+                                            />
                                         )}
 
                                         {/* Controls */}
