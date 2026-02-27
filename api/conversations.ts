@@ -48,14 +48,21 @@ export default async function handler(req: any, res: any) {
 
             case 'POST':
                 // Create new conversation
-                const { user_id, title } = req.body;
-                if (!user_id || !title) {
-                    return res.status(400).json({ ok: false, error: 'Missing user_id or title' });
+                const { user_id, title, prompt } = req.body;
+                if (!user_id) {
+                    return res.status(400).json({ ok: false, error: 'Missing user_id' });
                 }
+
+                // Auto-title logic
+                let finalTitle = title;
+                if (!finalTitle && prompt) {
+                    finalTitle = prompt.split(' ').slice(0, 5).join(' ').replace(/[#@*]/g, '') + (prompt.split(' ').length > 5 ? '...' : '');
+                }
+                if (!finalTitle) finalTitle = "Nova Arte";
 
                 const { data: newConv, error: createError } = await supabase
                     .from('conversations')
-                    .insert([{ user_id, title }])
+                    .insert([{ user_id, title: finalTitle }])
                     .select()
                     .single();
 

@@ -11,11 +11,11 @@ export const ChatStream: React.FC<ChatStreamProps> = ({ messages, onOpenEditor, 
     const EndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        EndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        EndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
     }, [messages, isGenerating]);
 
     return (
-        <div className="flex-1 w-full overflow-y-auto overflow-x-hidden p-6 space-y-8 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent pb-32">
+        <div className="flex-1 w-full overflow-y-auto overflow-x-hidden p-6 space-y-8 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
             {messages.map((msg, i) => {
                 const isUser = msg.role === 'user';
                 return (

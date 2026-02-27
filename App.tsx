@@ -168,7 +168,10 @@ const App: React.FC = () => {
           const res = await fetch('/api/conversations', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user_id: userId, title: prompt.substring(0, 30) + '...' })
+            body: JSON.stringify({
+              user_id: userId,
+              prompt: prompt // Backend generates title from prompt
+            })
           });
 
           if (res.ok) {
@@ -399,11 +402,10 @@ const App: React.FC = () => {
 
         <main className="flex-1 relative overflow-hidden flex flex-col bg-slate-50/50">
           {view === 'chat' ? (
-            <div className="flex-1 overflow-y-auto scroll-smooth bg-gradient-to-b from-white to-slate-50/30">
-              <div className={`min-h-full w-full flex flex-col items-center p-6 md:p-12 ${messages.length === 0 ? 'justify-center' : 'justify-start'}`}>
-
-                {/* Content Wrapper */}
-                <div className="w-full max-w-4xl flex flex-col gap-8">
+            <div className="flex-1 flex flex-col min-h-0 bg-gradient-to-b from-white to-slate-50/30">
+              {/* Chat Content Viewport */}
+              <div className="flex-1 overflow-y-auto scroll-smooth flex flex-col items-center">
+                <div className={`flex-1 w-full max-w-4xl flex flex-col p-6 md:p-12 ${messages.length === 0 ? 'justify-center' : 'justify-start'}`}>
 
                   {/* Hero Section (only if no messages) */}
                   {messages.length === 0 && (
@@ -424,27 +426,16 @@ const App: React.FC = () => {
 
                   {/* Messages Stream */}
                   {messages.length > 0 && (
-                    <div className="flex-1 min-h-[300px] flex flex-col">
-                      <ChatStream
-                        messages={messages}
-                        onOpenEditor={loadPastGenerationEditor}
-                        isGenerating={status === GenerationStatus.INTERPRETING || status === GenerationStatus.GENERATING_ART || status === GenerationStatus.GENERATING_TEXT || status === GenerationStatus.ASSEMBLING}
-                      />
-                    </div>
-                  )}
-
-                  {/* Composer Section */}
-                  <div className="w-full mt-auto pt-4 pb-20">
-                    <Composer
-                      onGenerate={handleGenerate}
-                      isGenerating={status !== GenerationStatus.IDLE && status !== GenerationStatus.SUCCESS && status !== GenerationStatus.ERROR}
-                      lastPrompt={lastPrompt}
+                    <ChatStream
+                      messages={messages}
+                      onOpenEditor={loadPastGenerationEditor}
+                      isGenerating={status === GenerationStatus.INTERPRETING || status === GenerationStatus.GENERATING_ART || status === GenerationStatus.GENERATING_TEXT || status === GenerationStatus.ASSEMBLING}
                     />
-                  </div>
+                  )}
 
                   {/* Onboarding Steps (only if no messages) */}
                   {messages.length === 0 && (
-                    <div className="flex items-center justify-center gap-8 text-slate-300 pb-12">
+                    <div className="flex items-center justify-center gap-8 text-slate-300 py-12">
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 font-bold">1</div>
                         <span className="text-[10px] font-black uppercase tracking-widest">Prompt</span>
@@ -462,6 +453,15 @@ const App: React.FC = () => {
                     </div>
                   )}
                 </div>
+              </div>
+
+              {/* Fixed Composer Bottom */}
+              <div className="w-full bg-gradient-to-t from-white via-white/40 to-transparent pt-8 pb-4 px-4 shrink-0">
+                <Composer
+                  onGenerate={handleGenerate}
+                  isGenerating={status !== GenerationStatus.IDLE && status !== GenerationStatus.SUCCESS && status !== GenerationStatus.ERROR}
+                  lastPrompt={lastPrompt}
+                />
               </div>
             </div>
           ) : (

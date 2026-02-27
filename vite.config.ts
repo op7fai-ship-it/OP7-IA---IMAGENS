@@ -64,11 +64,18 @@ export default defineConfig(({ mode }) => {
                 req.on('data', chunk => { body += chunk; });
                 req.on('end', () => {
                   try {
-                    const { user_id, title } = JSON.parse(body);
+                    const { user_id, title, prompt } = JSON.parse(body);
+
+                    // Auto-title logic
+                    let finalTitle = title || "Nova Arte";
+                    if (prompt && !title) {
+                      finalTitle = prompt.split(' ').slice(0, 5).join(' ').replace(/[#@*]/g, '') + (prompt.split(' ').length > 5 ? '...' : '');
+                    }
+
                     const newConv = {
                       id: Math.random().toString(36).substr(2, 9),
                       user_id,
-                      title: title || 'Nova Arte',
+                      title: finalTitle,
                       created_at: new Date().toISOString(),
                       updated_at: new Date().toISOString()
                     };
@@ -78,6 +85,21 @@ export default defineConfig(({ mode }) => {
                     res.statusCode = 400;
                     res.end(JSON.stringify({ ok: false, error: "Invalid JSON" }));
                   }
+                });
+                return;
+              }
+
+              if (req.method === 'PATCH') {
+                let body = '';
+                req.on('data', chunk => { body += chunk; });
+                req.on('end', () => {
+                  const { title } = JSON.parse(body);
+                  const conv = db.conversations.find(c => c.id === id);
+                  if (conv) {
+                    conv.title = title;
+                    conv.updated_at = new Date().toISOString();
+                  }
+                  res.end(JSON.stringify({ ok: true, data: conv }));
                 });
                 return;
               }
