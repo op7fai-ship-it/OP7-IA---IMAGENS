@@ -33,7 +33,14 @@ export const generateCreative = async (
     const response = await fetch('/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, images, options, format: options.format })
+      body: JSON.stringify({
+        prompt,
+        images,
+        options,
+        format: options.format,
+        userId: options.userId,
+        conversationId: options.conversationId
+      })
     });
 
     if (!response.ok) {

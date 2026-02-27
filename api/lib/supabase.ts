@@ -14,6 +14,10 @@ const supabaseKey =
 
 if (!supabaseUrl || !supabaseKey) {
     console.error("❌ [SUPABASE LIB] Credenciais CRÍTICAS ausentes. Configure SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY ou ANON_KEY.");
+} else {
+    const safeUrl = supabaseUrl.substring(0, 12) + "...";
+    const safeKey = supabaseKey.substring(0, 6) + "..." + supabaseKey.substring(supabaseKey.length - 4);
+    console.log(`📡 [SUPABASE LIB] Inicializando con: URL=${safeUrl}, KEY=${safeKey}`);
 }
 
 export const supabase = createClient(

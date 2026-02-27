@@ -1,0 +1,66 @@
+/* 🚀 OP7 IA - Premium Design System */
+:root {
+    --op7-navy: #002B5B;
+    --op7-blue: #1A73E8;
+    --op7-accent: #FF7D3C;
+    --op7-bg: #F8FAFC;
+    --op7-surface: #FFFFFF;
+    --op7-border: #E2E8F0;
+    --op7-text: #1E293B;
+    --op7-muted: #64748B;
+}
+
+body {
+    background-color: var(--op7-bg);
+    color: var(--op7-text);
+    font-family: 'Inter', sans-serif;
+    margin: 0;
+    padding: 0;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* Custom premium scrollbars */
+::-webkit-scrollbar {
+    width: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: #F1F5F9;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #CBD5E1;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #94A3B8;
+}
+
+.glass-panel {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+/* Base Tailwind classes fallbacks (for critical components) */
+.bg-op7-navy {
+    background-color: var(--op7-navy);
+}
+
+.text-op7-navy {
+    color: var(--op7-navy);
+}
+
+.bg-op7-blue {
+    background-color: var(--op7-blue);
+}
+
+.text-op7-blue {
+    color: var(--op7-blue);
+}
+
+.border-op7-border {
+    border-color: var(--op7-border);
+}

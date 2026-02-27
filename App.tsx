@@ -51,19 +51,21 @@ const App: React.FC = () => {
   const fetchConversations = useCallback(async (rehydrateId?: string | null) => {
     try {
       const res = await fetch(`/api/conversations?userId=${userId}`);
-      if (!res.ok) return;
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || `Erro HTTP ${res.status}`);
+      }
       const json = await res.json();
       if (json.ok && json.data) {
         setConversations(json.data);
-
-        // If we have a saved ID, rehydrate it
         const targetId = rehydrateId || localStorage.getItem('op7_active_conv');
         if (targetId && json.data.some((c: any) => c.id === targetId)) {
           handleSelectConversation(targetId);
         }
       }
-    } catch (err) {
-      console.warn("Conversations API não disponível.", err);
+    } catch (err: any) {
+      console.warn("Conversations API Fail:", err);
+      setErrorModalInfo({ title: "Erro de Conexão", message: "Não foi possível carregar suas conversas.", details: err.message });
     }
   }, [userId]);
 
@@ -76,8 +78,11 @@ const App: React.FC = () => {
     localStorage.setItem('op7_active_conv', id);
     setView('chat');
     try {
-      const res = await fetch(`/api/messages?conversationId=${id}`);
-      if (!res.ok) return;
+      const res = await fetch(`/api/messages?conversationId=${id}&userId=${userId}`);
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || `Erro HTTP ${res.status}`);
+      }
       const json = await res.json();
       if (json.ok && json.data) {
         setMessages(json.data);
@@ -254,12 +259,28 @@ const App: React.FC = () => {
         activeId={activeConversationId}
         onSelect={handleSelectConversation}
         onNew={handleNewConversation}
-        onDelete={(id) => fetch(`/api/conversations?id=${id}`, { method: 'DELETE' }).then(() => fetchConversations())}
-        onRename={(id, title) => fetch(`/api/conversations?id=${id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title })
-        }).then(() => fetchConversations())}
+        onDelete={async (id) => {
+          try {
+            const res = await fetch(`/api/conversations?id=${id}&userId=${userId}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error("Falha ao excluir");
+            fetchConversations();
+          } catch (err: any) {
+            setErrorModalInfo({ title: "Erro ao Excluir", message: "Não foi possível apagar a conversa.", details: err.message });
+          }
+        }}
+        onRename={async (id, title) => {
+          try {
+            const res = await fetch(`/api/conversations?id=${id}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ title, userId })
+            });
+            if (!res.ok) throw new Error("Falha ao renomear");
+            fetchConversations();
+          } catch (err: any) {
+            setErrorModalInfo({ title: "Erro ao Renomear", message: "Não foi possível salvar o novo nome.", details: err.message });
+          }
+        }}
       />
 
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-slate-50/20">
