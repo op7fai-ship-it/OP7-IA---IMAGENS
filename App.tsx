@@ -52,8 +52,8 @@ const App: React.FC = () => {
     try {
       const res = await fetch(`/api/conversations?userId=${userId}`);
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || `Erro HTTP ${res.status}`);
+        const errText = await res.text();
+        throw new Error(errText || `Erro HTTP ${res.status}`);
       }
       const json = await res.json();
       if (json.ok && json.data) {

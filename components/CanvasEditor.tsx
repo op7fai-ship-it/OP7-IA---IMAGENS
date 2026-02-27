@@ -65,25 +65,25 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
         const isDoubleClick = now - lastClickTime.current < 300;
         lastClickTime.current = now;
 
-        if (isDoubleClick && (layer.type === 'text' || layer.type === 'button')) {
-            setEditingId(layer.id);
-            setSelectedLayerId(layer.id);
+        if (isDoubleClick && (layer?.type === 'text' || layer?.type === 'button')) {
+            setEditingId(layer?.id);
+            setSelectedLayerId(layer?.id);
             setDraggingId(null);
             return;
         }
 
         e.stopPropagation();
-        setSelectedLayerId(layer.id);
-        setDraggingId(layer.id);
+        setSelectedLayerId(layer?.id || null);
+        setDraggingId(layer?.id || null);
         setEditingId(null);
 
-        if (canvasRef.current) {
+        if (canvasRef.current && layer?.position) {
             const rect = canvasRef.current.getBoundingClientRect();
             const mouseX = ((e.clientX - rect.left) / rect.width) * 100;
             const mouseY = ((e.clientY - rect.top) / rect.height) * 100;
             setDragOffset({
-                x: mouseX - layer.position.x,
-                y: mouseY - layer.position.y
+                x: mouseX - (layer.position.x || 0),
+                y: mouseY - (layer.position.y || 0)
             });
         }
     };
@@ -274,7 +274,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
                                                     color: layer?.style?.color || '#000000',
                                                     fontSize: `${layer?.style?.fontSize || 1}rem`,
                                                     fontWeight: layer?.style?.fontWeight || '400',
-                                                    fontFamily: layer?.style?.fontFamily || 'sans-serif',
+                                                    fontFamily: layer?.style?.fontFamily || 'Inter',
                                                     textAlign: (layer?.style?.textAlign || 'center') as any,
                                                     backgroundColor: layer?.style?.backgroundColor || 'transparent',
                                                     padding: `${layer?.style?.padding || 0}px`,
@@ -298,7 +298,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
                                                     backgroundColor: layer?.style?.backgroundColor || '#000000',
                                                     fontSize: `${layer?.style?.fontSize || 1}rem`,
                                                     fontWeight: layer?.style?.fontWeight || '900',
-                                                    fontFamily: layer?.style?.fontFamily || 'Montserrat',
+                                                    fontFamily: layer?.style?.fontFamily || 'Inter',
                                                     padding: `${layer?.style?.padding || 14}px`,
                                                     borderRadius: `${layer?.style?.borderRadius || 12}px`,
                                                     letterSpacing: layer?.style?.letterSpacing || '0.05em',
