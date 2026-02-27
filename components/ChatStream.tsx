@@ -10,12 +10,21 @@ interface ChatStreamProps {
 export const ChatStream: React.FC<ChatStreamProps> = ({ messages, onOpenEditor, isGenerating }) => {
     const EndRef = useRef<HTMLDivElement>(null);
 
+    const isFirstLoad = useRef(true);
+
     // Auto-scroll logic
     useEffect(() => {
         if (messages.length > 0 || isGenerating) {
-            EndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+            const behavior = isFirstLoad.current ? 'auto' : 'smooth';
+            EndRef.current?.scrollIntoView({ behavior, block: 'end' });
+            if (messages.length > 0) isFirstLoad.current = false;
         }
     }, [messages.length, isGenerating]);
+
+    // Reset first load when conversation changes (messages cleared or replaced)
+    useEffect(() => {
+        if (messages.length === 0) isFirstLoad.current = true;
+    }, [messages.length]);
 
     return (
         <div className="flex-1 w-full overflow-y-auto overflow-x-hidden scroll-smooth">
