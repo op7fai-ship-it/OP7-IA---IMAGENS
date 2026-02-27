@@ -79,10 +79,7 @@ const App: React.FC = () => {
     setView('chat');
     try {
       const res = await fetch(`/api/messages?conversationId=${id}&userId=${userId}`);
-      if (!res.ok) {
-        const errorRaw = await res.text();
-        throw new Error(errorRaw || `Erro HTTP ${res.status}`);
-      }
+      if (!res.ok) { const errText = await res.text(); throw new Error(errText); }
       const json = await res.json();
       if (json.ok && json.data) {
         setMessages(json.data);
@@ -158,10 +155,7 @@ const App: React.FC = () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ user_id: userId, prompt: prompt_text, title: autoTitle })
           });
-          if (!res.ok) {
-            const errRaw = await res.text();
-            throw new Error(`Conversations create fail: ${errRaw}`);
-          }
+          if (!res.ok) { const errText = await res.text(); throw new Error(errText); }
           const json = await res.json();
           if (json.ok) {
             currentConvId = json.data.id;
@@ -185,10 +179,7 @@ const App: React.FC = () => {
               content: { text: prompt_text, references: images_ref }
             })
           });
-          if (!res.ok) {
-            const errRaw = await res.text();
-            throw new Error(`Message save fail: ${errRaw}`);
-          }
+          if (!res.ok) { const errText = await res.text(); throw new Error(errText); }
         } catch (dbSaveErr) { console.warn("Falha ao salvar msg do usuario:", dbSaveErr); }
       }
 

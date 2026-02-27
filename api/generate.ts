@@ -223,8 +223,8 @@ export default async function handler(req: any, res: any) {
 
     return res.status(200).json({ ok: true, data, ...dbPayload });
 
-  } catch (globalError: any) {
-    console.error("💥 [BACKEND CRITICAL]:", globalError);
-    return res.status(500).json({ ok: false, error: globalError.message || 'Erro interno no servidor' });
+  } catch (error: any) {
+    console.error("💥 [BACKEND CRITICAL]:", error);
+    return res.status(500).json({ ok: false, error: error.message });
   }
 }

@@ -45,6 +45,6 @@ export default async function handler(req: any, res: any) {
         });
     } catch (error: any) {
         console.error("💥 [HEALTH CHECK] Critical Error:", error);
-        return res.status(500).json({ ok: false, error: error.message || 'Erro interno no servidor' });
+        return res.status(500).json({ ok: false, error: error.message });
     }
 }
