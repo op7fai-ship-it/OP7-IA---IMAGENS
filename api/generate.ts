@@ -43,28 +43,77 @@ export default async function handler(req: any, res: any) {
     };
 
     const systemPrompt = `
-      VOCÊ É UM DIRETOR DE ARTE DE ELITE.
-      SEU OBJETIVO: Criar um anúncio visualmente deslumbrante e persuasivo.
+      VOCÊ É UM ENGENHEIRO DE DESIGN E DIRETOR DE ARTE DE ELITE.
+      SEU OBJETIVO: Converter pedidos de marketing em layouts estruturados de alto impacto.
 
-      REGRAS CRÍTICAS:
-      1. FIDELIDADE COR/ESTILO: Use a paleta: ${JSON.stringify(paletteObj)}.
-      2. BACKGROUND: O 'backgroundPrompt' deve ser uma descrição detalhada 8k.
-      3. SE HOUVER IMAGENS ANEXADAS: Elas são sua REFERÊNCIA OBRIGATÓRIA. Analise o estilo, composição e produtos nelas e incorpore na sua descrição visual. NÃO IGNORE AS REFERÊNCIAS.
-      
-      FORMATO: ${format || options?.format || '1080x1350'}
+      REGRAS DE OURO PARA O LAYOUT:
+      1. COORDENADAS: Use rigorosamente o sistema de porcentagem (0 a 100) para 'position' (x, y) e 'size' (width, height). O canvas é sua área de trabalho total.
+      2. CAMADAS OBRIGATÓRIAS (IDs exatos):
+         - "art" (tipo: image): Representa o produto ou elemento visual gerado.
+         - "headline" (tipo: text): Título principal curto e impactante.
+         - "cta" (tipo: button): Chamada de ação persuasiva.
+      3. TIPOGRAFIA PREMIUM:
+         - Use apenas: 'Montserrat', 'Bebas Neue', 'Inter' ou 'Outfit'.
+         - 'fontSize' deve ser um número representando escala visual (ex: 4.5).
+         - 'fontWeight' deve ser string (ex: '900').
+      4. CORES: Use a paleta: ${JSON.stringify(paletteObj)}.
 
-      RETORNE RIGOROSAMENTE APENAS JSON:
+      CRITICAL CONSTRAINTS:
+      - CRÍTICO: Todo objeto dentro do array 'layers' DEVE conter obrigatoriamente as chaves: 'id', 'type', 'name', 'content', 'position' e 'style'. Nunca omita o campo 'name'.
+      - Use ID: "art" for the main product/subject image.
+      - Use ID: "headline" for the main title text.
+
+      FORMATO DE RESPOSTA (RIGOROSAMENTE APENAS JSON):
       {
-        "headline": "Título impacto",
-        "description": "Texto persuasivo curto",
-        "cta": "Texto do Botão",
-        "backgroundPrompt": "Descrição visual ultra-detalhada para gerar a imagem de fundo",
+        "headline": "Título curto",
+        "description": "Copy de apoio",
+        "cta": "Texto do botão",
+        "backgroundPrompt": "Descrição 8k, hyper-realistic, studio lighting, cinematographic background for: [TEMA]",
         "config": {
           "size": "${format || options?.format || '1080x1350'}",
           "backgroundColor": "${paletteObj.background}",
           "layers": [
-            { "id": "art", "type": "image", "content": "PLACEHOLDER", "position": {"x": 50, "y": 45}, "size": {"width": 80, "height": 60}, "style": {"borderRadius": 24} },
-            { "id": "headline", "type": "text", "content": "HEADLINE IMPACTANTE", "position": {"x": 50, "y": 20}, "size": {"width": 90, "height": 15}, "style": {"color": "${paletteObj.text}", "fontSize": 4.5, "fontWeight": "900", "textAlign": "center", "fontFamily": "Montserrat"} }
+            {
+              "id": "art",
+              "type": "image",
+              "name": "Elemento Visual",
+              "content": "PLACEHOLDER",
+              "position": {"x": 50, "y": 45},
+              "size": {"width": 80, "height": 60},
+              "style": {"borderRadius": 24, "objectFit": "contain"}
+            },
+            {
+              "id": "headline",
+              "type": "text",
+              "name": "Título",
+              "content": "TITLE EM MAIÚSCULO",
+              "position": {"x": 50, "y": 20},
+              "size": {"width": 90, "height": 15},
+              "style": {
+                "color": "${paletteObj.text}",
+                "fontSize": 4.5,
+                "fontWeight": "900",
+                "fontFamily": "Montserrat",
+                "textAlign": "center",
+                "textTransform": "uppercase"
+              }
+            },
+            {
+              "id": "cta",
+              "type": "button",
+              "name": "Botão de Ação",
+              "content": "TEXTO DO BOTÃO",
+              "position": {"x": 50, "y": 85},
+              "size": {"width": 40, "height": 8},
+              "style": {
+                "backgroundColor": "${paletteObj.accent}",
+                "color": "#FFFFFF",
+                "borderRadius": 50,
+                "fontSize": 1.2,
+                "fontWeight": "800",
+                "fontFamily": "Inter"
+              }
+            }
           ]
         }
       }
@@ -145,9 +194,13 @@ export default async function handler(req: any, res: any) {
     if (data.config) {
       data.config.backgroundImage = finalImgSrc;
       if (data.config.layers) {
-        data.config.layers = data.config.layers.map((l: any) =>
-          l.type === 'image' ? { ...l, content: finalImgSrc } : l
-        );
+        data.config.layers = data.config.layers.map((l: any) => {
+          // Priority 1: Map to 'art' ID if it exists
+          if (l.id === 'art') return { ...l, content: finalImgSrc };
+          // Priority 2: Fallback for generic image types if 'art' wasn't used
+          if (l.type === 'image' && l.content === 'PLACEHOLDER') return { ...l, content: finalImgSrc };
+          return l;
+        });
       }
     }
 

@@ -15,26 +15,28 @@ export default async function handler(req: any, res: any) {
     let dbConnected = false;
     const missingEnvs: string[] = [];
 
-    // Check Gemini
-    const geminiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-    if (!geminiKey) missingEnvs.push("GEMINI_API_KEY (ou VITE_ / NEXT_PUBLIC_)");
+    // Check Gemini (Strict Server Side)
+    const geminiKey = process.env.GEMINI_API_KEY;
+    if (!geminiKey) missingEnvs.push("GEMINI_API_KEY");
 
-    // Check Supabase Envs
-    const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-    if (!sbUrl) missingEnvs.push("NEXT_PUBLIC_SUPABASE_URL");
+    // Check Supabase Envs (Strict Server Side)
+    const sbUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+    if (!sbUrl) missingEnvs.push("SUPABASE_URL");
 
-    const sbKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
-    if (!sbKey) missingEnvs.push("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+    const sbKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!sbKey) missingEnvs.push("SUPABASE_KEY");
 
-    // Check real DB connection
+    // 🚀 TESTE REAL DE CONEXÃO (INFRAESTRUTURA)
     try {
-        const { data, error } = await supabase.from('conversations').select('id').limit(1);
+        const { error } = await supabase.from('conversations').select('id').limit(1);
         if (!error) {
             dbConnected = true;
         } else {
-            console.error("DB Health Check details:", error);
+            console.error("❌ [HEALTH CHECK] Supabase Connection Error:", error.message);
+            dbConnected = false;
         }
-    } catch (e) {
+    } catch (e: any) {
+        console.error("💥 [HEALTH CHECK] Critical Exception:", e.message);
         dbConnected = false;
     }
 

@@ -59,7 +59,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
     }, [setConfig]);
 
     const handleMouseDown = (layer: Layer, e: React.MouseEvent) => {
-        if (layer.locked || editingId === layer.id) return;
+        if (layer?.locked || editingId === layer?.id) return;
 
         const now = Date.now();
         const isDoubleClick = now - lastClickTime.current < 300;
@@ -236,28 +236,28 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
                         {snapLines.y !== null && <div className="absolute left-0 right-0 top-1/2 h-[1px] bg-op7-blue/50 z-[100] pointer-events-none" />}
 
                         {/* Creative Layers */}
-                        {config.layers.map(layer => {
-                            const isSelected = selectedLayerId === layer.id;
-                            const isEditing = editingId === layer.id;
-                            const isVisible = layer.visible !== false;
+                        {config?.layers?.map(layer => {
+                            const isSelected = selectedLayerId === layer?.id;
+                            const isEditing = editingId === layer?.id;
+                            const isVisible = layer?.visible !== false;
 
                             return (
                                 <div
-                                    key={layer.id}
+                                    key={layer?.id}
                                     className={`absolute z-10 ${isSelected ? 'z-20' : ''} ${!isVisible ? 'opacity-0 pointer-events-none' : ''}`}
                                     style={{
-                                        top: `${layer.position.y}%`,
-                                        left: `${layer.position.x}%`,
-                                        width: `${layer.size.width}%`,
+                                        top: `${layer?.position?.y ?? 0}%`,
+                                        left: `${layer?.position?.x ?? 0}%`,
+                                        width: `${layer?.size?.width ?? 0}%`,
                                         transform: 'translate(-50%, -50%)',
-                                        cursor: layer.locked ? 'not-allowed' : (isEditing ? 'text' : 'move'),
-                                        pointerEvents: layer.locked ? 'none' : 'auto'
+                                        cursor: layer?.locked ? 'not-allowed' : (isEditing ? 'text' : 'move'),
+                                        pointerEvents: layer?.locked ? 'none' : 'auto'
                                     }}
                                     onMouseDown={(e) => handleMouseDown(layer, e)}
                                 >
                                     <div className={`relative w-full group transition-all ${isSelected ? (isEditing ? '' : 'ring-2 ring-op7-blue shadow-2xl') : 'hover:ring-1 hover:ring-op7-blue/20'}`}>
 
-                                        {layer.type === 'text' && (
+                                        {layer?.type === 'text' && (
                                             <div
                                                 contentEditable={isEditing}
                                                 suppressContentEditableWarning
@@ -266,61 +266,79 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
                                                     const newContent = e.currentTarget.innerText;
                                                     setConfig(prev => ({
                                                         ...prev,
-                                                        layers: prev.layers.map(l => l.id === layer.id ? { ...l, content: newContent } : l)
+                                                        layers: prev.layers.map(l => l.id === layer?.id ? { ...l, content: newContent } : l)
                                                     }));
                                                 }}
                                                 className={`w-full outline-none break-words select-text ${isEditing ? 'cursor-text bg-white/10 ring-1 ring-op7-blue/50 p-1' : ''}`}
                                                 style={{
-                                                    color: layer.style.color,
-                                                    fontSize: `${layer.style.fontSize}rem`,
-                                                    fontWeight: layer.style.fontWeight,
-                                                    fontFamily: layer.style.fontFamily,
-                                                    textAlign: layer.style.textAlign || 'center',
-                                                    backgroundColor: layer.style.backgroundColor,
-                                                    padding: `${layer.style.padding || 0}px`,
-                                                    borderRadius: `${layer.style.borderRadius || 0}px`,
-                                                    textTransform: layer.style.textTransform as any || 'none',
-                                                    lineHeight: layer.style.lineHeight || '1.1',
-                                                    letterSpacing: layer.style.letterSpacing || 'normal',
-                                                    transform: `rotate(${layer.style.rotate || 0}deg)`
+                                                    color: layer?.style?.color || '#000000',
+                                                    fontSize: `${layer?.style?.fontSize || 1}rem`,
+                                                    fontWeight: layer?.style?.fontWeight || '400',
+                                                    fontFamily: layer?.style?.fontFamily || 'sans-serif',
+                                                    textAlign: (layer?.style?.textAlign || 'center') as any,
+                                                    backgroundColor: layer?.style?.backgroundColor || 'transparent',
+                                                    padding: `${layer?.style?.padding || 0}px`,
+                                                    borderRadius: `${layer?.style?.borderRadius || 0}px`,
+                                                    textTransform: (layer?.style?.textTransform || 'none') as any,
+                                                    lineHeight: layer?.style?.lineHeight || '1.1',
+                                                    letterSpacing: layer?.style?.letterSpacing || 'normal',
+                                                    transform: `rotate(${layer?.style?.rotate || 0}deg)`
                                                 }}
                                             >
-                                                {layer.content}
+                                                {layer?.content || ''}
                                             </div>
                                         )}
 
-                                        {layer.type === 'button' && (
+                                        {layer?.type === 'button' && (
                                             <div
-                                                className="w-full text-center flex items-center justify-center font-black uppercase tracking-widest shadow-lg"
+                                                className="w-full text-center flex items-center justify-center tracking-widest shadow-lg overflow-hidden transition-all duration-300"
                                                 style={{
-                                                    color: layer.style.color,
-                                                    backgroundColor: layer.style.backgroundColor,
-                                                    fontSize: `${layer.style.fontSize}rem`,
-                                                    padding: `${layer.style.padding || 12}px`,
-                                                    borderRadius: `${layer.style.borderRadius || 12}px`,
-                                                    transform: `rotate(${layer.style.rotate || 0}deg)`
+                                                    color: layer?.style?.color || '#FFFFFF',
+                                                    backgroundColor: layer?.style?.backgroundColor || '#000000',
+                                                    fontSize: `${layer?.style?.fontSize || 1}rem`,
+                                                    fontWeight: layer?.style?.fontWeight || '900',
+                                                    fontFamily: layer?.style?.fontFamily || 'Montserrat',
+                                                    padding: `${layer?.style?.padding || 14}px`,
+                                                    borderRadius: `${layer?.style?.borderRadius || 12}px`,
+                                                    letterSpacing: layer?.style?.letterSpacing || '0.05em',
+                                                    textTransform: (layer?.style?.textTransform || 'uppercase') as any,
+                                                    transform: `rotate(${layer?.style?.rotate || 0}deg)`,
+                                                    border: 'none',
+                                                    cursor: isEditing ? 'text' : 'pointer'
                                                 }}
                                             >
-                                                <span contentEditable={isEditing} suppressContentEditableWarning className="outline-none">
-                                                    {layer.content}
+                                                <span
+                                                    contentEditable={isEditing}
+                                                    suppressContentEditableWarning
+                                                    className="outline-none"
+                                                    onBlur={(e) => {
+                                                        setEditingId(null);
+                                                        const newContent = e.currentTarget.innerText;
+                                                        setConfig(prev => ({
+                                                            ...prev,
+                                                            layers: prev.layers.map(l => l.id === layer?.id ? { ...l, content: newContent } : l)
+                                                        }));
+                                                    }}
+                                                >
+                                                    {layer?.content || ''}
                                                 </span>
                                             </div>
                                         )}
 
-                                        {layer.type === 'image' && (
-                                            <img src={layer.content} className="w-full h-auto pointer-events-none transition-transform duration-500" />
+                                        {layer?.type === 'image' && (
+                                            <img src={layer?.content || ''} className="w-full h-auto pointer-events-none transition-transform duration-500" />
                                         )}
 
                                         {/* Resize & UI Indicators */}
                                         {isSelected && !isEditing && (
                                             <>
                                                 <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-op7-navy text-white text-[9px] px-3 py-1.5 rounded-lg font-black whitespace-nowrap shadow-xl border border-white/10 flex items-center gap-2">
-                                                    {layer.locked ? <Lock size={10} /> : <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />}
-                                                    {layer.name.toUpperCase()}
+                                                    {layer?.locked ? <Lock size={10} /> : <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />}
+                                                    {layer?.name?.toUpperCase() || 'CAMADA'}
                                                 </div>
                                                 <div
                                                     className="absolute -bottom-3 -right-3 w-7 h-7 bg-white border-2 border-op7-blue rounded-lg flex items-center justify-center cursor-nwse-resize shadow-premium z-50 hover:scale-110 transition-transform"
-                                                    onMouseDown={(e) => handleResizeStart(layer.id, e)}
+                                                    onMouseDown={(e) => handleResizeStart(layer?.id, e)}
                                                 >
                                                     <Maximize2 size={12} className="text-op7-blue" />
                                                 </div>
@@ -370,27 +388,27 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
                         <div className="space-y-4">
                             <h3 className="text-[10px] font-black text-op7-navy uppercase tracking-widest opacity-40">Estrutura Visual</h3>
                             <div className="grid gap-2">
-                                {config.layers.map(layer => (
+                                {config?.layers?.map(layer => (
                                     <div
-                                        key={layer.id}
-                                        onClick={() => setSelectedLayerId(layer.id)}
-                                        className={`group flex items-center justify-between p-3.5 rounded-2xl border transition-all cursor-pointer ${selectedLayerId === layer.id ? 'bg-op7-blue/5 border-op7-blue/20 shadow-sm' : 'bg-slate-50/50 border-slate-100 hover:border-slate-200'}`}
+                                        key={layer?.id}
+                                        onClick={() => setSelectedLayerId(layer?.id)}
+                                        className={`group flex items-center justify-between p-3.5 rounded-2xl border transition-all cursor-pointer ${selectedLayerId === layer?.id ? 'bg-op7-blue/5 border-op7-blue/20 shadow-sm' : 'bg-slate-50/50 border-slate-100 hover:border-slate-200'}`}
                                     >
                                         <div className="flex items-center gap-3">
-                                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${selectedLayerId === layer.id ? 'bg-op7-blue text-white shadow-lg shadow-op7-blue/20' : 'bg-white text-slate-400 border border-slate-200'}`}>
-                                                {layer.type === 'text' ? <Type size={16} /> : layer.type === 'button' ? <Send size={16} /> : <ImageIcon size={16} />}
+                                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${selectedLayerId === layer?.id ? 'bg-op7-blue text-white shadow-lg shadow-op7-blue/20' : 'bg-white text-slate-400 border border-slate-200'}`}>
+                                                {layer?.type === 'text' ? <Type size={16} /> : layer?.type === 'button' ? <Send size={16} /> : <ImageIcon size={16} />}
                                             </div>
                                             <div>
-                                                <p className={`text-[11px] font-black uppercase tracking-tight ${selectedLayerId === layer.id ? 'text-op7-navy' : 'text-slate-600'}`}>{layer.name}</p>
-                                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{layer.type}</p>
+                                                <p className={`text-[11px] font-black uppercase tracking-tight ${selectedLayerId === layer?.id ? 'text-op7-navy' : 'text-slate-600'}`}>{layer?.name || 'Camada S/N'}</p>
+                                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{layer?.type || 'Elemento'}</p>
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-1">
-                                            <button onClick={(e) => { e.stopPropagation(); handleLayerAction(layer.id, 'visible'); }} className="p-2 hover:bg-white rounded-lg transition-colors text-slate-400 hover:text-op7-blue">
-                                                {layer.visible !== false ? <Eye size={14} /> : <EyeOff size={14} className="opacity-40" />}
+                                            <button onClick={(e) => { e.stopPropagation(); handleLayerAction(layer?.id, 'visible'); }} className="p-2 hover:bg-white rounded-lg transition-colors text-slate-400 hover:text-op7-blue">
+                                                {layer?.visible !== false ? <Eye size={14} /> : <EyeOff size={14} className="opacity-40" />}
                                             </button>
-                                            <button onClick={(e) => { e.stopPropagation(); handleLayerAction(layer.id, 'locked'); }} className={`p-2 hover:bg-white rounded-lg transition-colors ${layer.locked ? 'text-op7-accent' : 'text-slate-400 hover:text-op7-blue'}`}>
-                                                {layer.locked ? <Lock size={14} /> : <Unlock size={14} />}
+                                            <button onClick={(e) => { e.stopPropagation(); handleLayerAction(layer?.id, 'locked'); }} className={`p-2 hover:bg-white rounded-lg transition-colors ${layer?.locked ? 'text-op7-accent' : 'text-slate-400 hover:text-op7-blue'}`}>
+                                                {layer?.locked ? <Lock size={14} /> : <Unlock size={14} />}
                                             </button>
                                         </div>
                                     </div>
@@ -420,6 +438,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
 
 const DiagnosticProps: React.FC<{ layer: Layer; setConfig: any; isBackground?: boolean }> = ({ layer, setConfig, isBackground }) => {
     if (isBackground) return <div className="text-xs text-slate-400 font-bold uppercase tracking-widest py-10 text-center border border-dashed rounded-3xl">Propriedades de Fundo Global</div>;
+    if (!layer) return null;
     return (
         <div className="space-y-8">
             <div className="space-y-3">
@@ -427,16 +446,16 @@ const DiagnosticProps: React.FC<{ layer: Layer; setConfig: any; isBackground?: b
                 <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
                         <label className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Posição X</label>
-                        <input type="number" value={Math.round(layer.position.x)} onChange={(e) => setConfig((p: any) => ({ ...p, layers: p.layers.map((l: any) => l.id === layer.id ? { ...l, position: { ...l.position, x: parseInt(e.target.value) } } : l) }))} className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-xs font-black" />
+                        <input type="number" value={Math.round(layer?.position?.x || 0)} onChange={(e) => setConfig((p: any) => ({ ...p, layers: p.layers.map((l: any) => l.id === layer?.id ? { ...l, position: { ...l.position, x: parseInt(e.target.value) } } : l) }))} className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-xs font-black" />
                     </div>
                     <div className="space-y-1.5">
                         <label className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Posição Y</label>
-                        <input type="number" value={Math.round(layer.position.y)} onChange={(e) => setConfig((p: any) => ({ ...p, layers: p.layers.map((l: any) => l.id === layer.id ? { ...l, position: { ...l.position, y: parseInt(e.target.value) } } : l) }))} className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-xs font-black" />
+                        <input type="number" value={Math.round(layer?.position?.y || 0)} onChange={(e) => setConfig((p: any) => ({ ...p, layers: p.layers.map((l: any) => l.id === layer?.id ? { ...l, position: { ...l.position, y: parseInt(e.target.value) } } : l) }))} className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-xs font-black" />
                     </div>
                 </div>
             </div>
 
-            {(layer.type === 'text' || layer.type === 'button') && (
+            {(layer?.type === 'text' || layer?.type === 'button') && (
                 <div className="space-y-6">
                     <div className="space-y-3">
                         <h3 className="text-[10px] font-black text-op7-navy uppercase tracking-widest opacity-40">Estilo de Texto</h3>
@@ -444,16 +463,16 @@ const DiagnosticProps: React.FC<{ layer: Layer; setConfig: any; isBackground?: b
                             <div className="space-y-1.5">
                                 <label className="text-[9px] font-bold text-slate-400 uppercase">Conteúdo</label>
                                 <textarea
-                                    value={layer.content}
-                                    onChange={(e) => setConfig((p: any) => ({ ...p, layers: p.layers.map((l: any) => l.id === layer.id ? { ...l, content: e.target.value } : l) }))}
+                                    value={layer?.content || ''}
+                                    onChange={(e) => setConfig((p: any) => ({ ...p, layers: p.layers.map((l: any) => l.id === layer?.id ? { ...l, content: e.target.value } : l) }))}
                                     className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-medium min-h-[100px] resize-none focus:bg-white focus:ring-2 focus:ring-op7-blue/10 transition-all outline-none"
                                 />
                             </div>
                             <div className="space-y-1.5">
                                 <label className="text-[9px] font-bold text-slate-400 uppercase">Tipografia</label>
                                 <select
-                                    value={layer.style.fontFamily}
-                                    onChange={(e) => setConfig((p: any) => ({ ...p, layers: p.layers.map((l: any) => l.id === layer.id ? { ...l, style: { ...l.style, fontFamily: e.target.value } } : l) }))}
+                                    value={layer?.style?.fontFamily || 'Montserrat'}
+                                    onChange={(e) => setConfig((p: any) => ({ ...p, layers: p.layers.map((l: any) => l.id === layer?.id ? { ...l, style: { ...l.style, fontFamily: e.target.value } } : l) }))}
                                     className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-xs font-black"
                                 >
                                     <option value="Montserrat">Montserrat</option>
