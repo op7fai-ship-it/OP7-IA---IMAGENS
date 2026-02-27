@@ -10,108 +10,108 @@ interface ChatStreamProps {
 export const ChatStream: React.FC<ChatStreamProps> = ({ messages, onOpenEditor, isGenerating }) => {
     const EndRef = useRef<HTMLDivElement>(null);
 
+    // Auto-scroll logic
     useEffect(() => {
-        EndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-    }, [messages, isGenerating]);
+        if (messages.length > 0 || isGenerating) {
+            EndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }
+    }, [messages.length, isGenerating]);
 
     return (
-        <div className="flex-1 w-full overflow-y-auto overflow-x-hidden p-6 space-y-8 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
-            {messages.map((msg, i) => {
-                const isUser = msg.role === 'user';
-                return (
-                    <div key={msg.id || i} className={`flex ${isUser ? 'justify-end' : 'justify-start'} w-full`}>
-                        {/* Avatar Assistant */}
-                        {!isUser && (
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-op7-navy to-op7-blue flex items-center justify-center text-white shrink-0 shadow-lg shadow-op7-blue/20 mr-3">
-                                <Bot size={14} />
-                            </div>
-                        )}
+        <div className="flex-1 w-full overflow-y-auto overflow-x-hidden scroll-smooth">
+            {/* Center column with max-width */}
+            <div className="max-w-4xl mx-auto w-full px-4 md:px-8 py-10 space-y-10">
+                {messages.length === 0 && !isGenerating && (
+                    <div className="h-20" /> // Spacer for empty state
+                )}
 
-                        <div className={`max-w-[75%] rounded-2xl p-4 ${isUser ? 'bg-op7-blue text-white shadow-xl shadow-op7-blue/20 rounded-tr-sm' : 'bg-white shadow-premium border border-slate-100/50 rounded-tl-sm text-slate-700'}`}>
-
-                            {isUser ? (
-                                // USER MESSAGE
-                                <div className="text-[14px] leading-relaxed break-words whitespace-pre-wrap">
-                                    {msg.content?.text || msg.content}
+                {messages.map((msg, i) => {
+                    const isUser = msg.role === 'user';
+                    return (
+                        <div key={msg.id || i} className={`flex ${isUser ? 'justify-end' : 'justify-start'} w-full animate-in fade-in slide-in-from-bottom-2 duration-300`}>
+                            {/* Avatar Assistant */}
+                            {!isUser && (
+                                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-op7-navy to-op7-blue flex items-center justify-center text-white shrink-0 shadow-lg shadow-op7-blue/20 mr-3 mt-1">
+                                    <Bot size={18} />
                                 </div>
-                            ) : (
-                                // ASSISTANT MESSAGE
-                                <div className="space-y-4">
-                                    {msg.content?.headline && (
-                                        <div>
-                                            <h4 className="font-black text-op7-navy text-lg leading-tight mb-2">{msg.content.headline}</h4>
-                                            <p className="text-sm text-slate-500 leading-relaxed font-medium">{msg.content.description}</p>
-                                        </div>
-                                    )}
+                            )}
 
-                                    {msg.content?.cta && (
-                                        <div className="inline-block px-3 py-1.5 bg-slate-100 rounded-lg text-xs font-bold text-slate-600 mt-2">
-                                            CTA: {msg.content.cta}
-                                        </div>
-                                    )}
+                            <div className={`max-w-[85%] rounded-[24px] px-6 py-4 ${isUser ? 'bg-op7-blue text-white shadow-xl shadow-op7-blue/20 rounded-tr-sm' : 'bg-white shadow-premium border border-slate-100/80 rounded-tl-sm text-slate-700'}`}>
 
-                                    {msg.content?.config && (
-                                        <div className="mt-4 pt-4 border-t border-slate-100">
-                                            <div className="flex flex-wrap gap-2 mb-4">
-                                                <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-400 bg-slate-50 border border-slate-100 px-2 py-1 rounded-md">
-                                                    <ImageIcon size={10} /> {msg.content.config.size}
-                                                </span>
-                                                {msg.content.config.backgroundColor && (
-                                                    <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-slate-400 bg-slate-50 border border-slate-100 px-2 py-1 rounded-md">
-                                                        <Palette size={10} /> Cor de Fundo
-                                                        <div className="w-3 h-3 rounded-full border border-black/10 ml-1" style={{ backgroundColor: msg.content.config.backgroundColor }} />
-                                                    </span>
-                                                )}
+                                {isUser ? (
+                                    <div className="text-[15px] leading-relaxed break-words whitespace-pre-wrap font-medium">
+                                        {msg.content?.text || msg.content}
+                                    </div>
+                                ) : (
+                                    <div className="space-y-5">
+                                        {msg.content?.headline && (
+                                            <div>
+                                                <h4 className="font-black text-op7-navy text-xl leading-tight mb-2 tracking-tight">{msg.content.headline}</h4>
+                                                <p className="text-[14px] text-slate-500 leading-relaxed font-medium">{msg.content.description}</p>
                                             </div>
+                                        )}
 
-                                            <button
-                                                onClick={() => onOpenEditor(msg.id)}
-                                                className="w-full sm:w-auto flex items-center justify-center gap-2 bg-op7-navy hover:bg-op7-blue text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-lg hover:shadow-xl text-sm"
-                                            >
-                                                <Edit size={16} /> Abrir no Editor VisuaI
-                                            </button>
-
-                                            {/* Debug Instrumentation (Subtle) */}
-                                            <div className="mt-4 flex flex-wrap gap-2 opacity-30 hover:opacity-100 transition-opacity">
-                                                <span className="text-[8px] font-mono text-slate-400">
-                                                    ID: {msg.id.substring(0, 6)}
-                                                </span>
-                                                {msg.content?.image && (
-                                                    <span className="text-[8px] font-mono text-slate-400">
-                                                        TYPE: {msg.content.image.kind} | {msg.content.image.mimeType}
-                                                    </span>
-                                                )}
+                                        {msg.content?.cta && (
+                                            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-lg text-xs font-bold text-slate-500">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-op7-accent" />
+                                                CTA: {msg.content.cta}
                                             </div>
-                                        </div>
-                                    )}
+                                        )}
+
+                                        {msg.content?.config && (
+                                            <div className="mt-4 pt-5 border-t border-slate-50">
+                                                <div className="flex flex-wrap gap-2 mb-5">
+                                                    <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-400 bg-slate-50/50 border border-slate-100 px-2 py-1 rounded-md">
+                                                        <ImageIcon size={10} /> {msg.content.config.size}
+                                                    </span>
+                                                </div>
+
+                                                <button
+                                                    onClick={() => onOpenEditor(msg.id)}
+                                                    className="w-full sm:w-auto flex items-center justify-center gap-2 bg-op7-navy hover:bg-op7-blue text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 text-sm"
+                                                >
+                                                    <Edit size={16} /> Abrir no Editor de Design
+                                                </button>
+
+                                                {/* Debug instrumentation */}
+                                                <div className="mt-6 flex flex-wrap gap-3 opacity-20 hover:opacity-100 transition-opacity">
+                                                    <span className="text-[9px] font-mono text-slate-400">MSG_ID: {msg.id.substring(0, 8)}</span>
+                                                    {msg.content?.image && (
+                                                        <span className="text-[9px] font-mono text-slate-400 uppercase">IMG: {msg.content.image.kind}</span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Avatar User */}
+                            {isUser && (
+                                <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 shrink-0 shadow-sm ml-3 border border-slate-200 mt-1">
+                                    <User size={18} />
                                 </div>
                             )}
                         </div>
+                    );
+                })}
 
-                        {/* Avatar User */}
-                        {isUser && (
-                            <div className="w-8 h-8 rounded-full bg-slate-gradient flex items-center justify-center text-slate-400 shrink-0 shadow-sm ml-3 border border-slate-200">
-                                <User size={14} />
-                            </div>
-                        )}
+                {isGenerating && (
+                    <div className="flex justify-start w-full animate-in fade-in duration-500">
+                        <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-op7-navy to-op7-blue flex items-center justify-center text-white shrink-0 shadow-lg shadow-op7-blue/20 mr-3 animate-pulse">
+                            <Bot size={18} />
+                        </div>
+                        <div className="bg-white shadow-premium border border-slate-100/50 rounded-2xl rounded-tl-sm p-4 flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-op7-blue/40 animate-bounce" style={{ animationDelay: '0ms' }} />
+                            <span className="w-2 h-2 rounded-full bg-op7-blue/40 animate-bounce" style={{ animationDelay: '150ms' }} />
+                            <span className="w-2 h-2 rounded-full bg-op7-blue/40 animate-bounce" style={{ animationDelay: '300ms' }} />
+                        </div>
                     </div>
-                );
-            })}
+                )}
 
-            {isGenerating && (
-                <div className="flex justify-start w-full animate-in fade-in duration-500">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-op7-navy to-op7-blue flex items-center justify-center text-white shrink-0 shadow-lg shadow-op7-blue/20 mr-3 animate-pulse">
-                        <Bot size={14} />
-                    </div>
-                    <div className="bg-white shadow-premium border border-slate-100/50 rounded-2xl rounded-tl-sm p-4 flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-slate-300 animate-bounce" style={{ animationDelay: '0ms' }} />
-                        <span className="w-2 h-2 rounded-full bg-slate-300 animate-bounce" style={{ animationDelay: '150ms' }} />
-                        <span className="w-2 h-2 rounded-full bg-slate-300 animate-bounce" style={{ animationDelay: '300ms' }} />
-                    </div>
-                </div>
-            )}
-
-            <div ref={EndRef} />
+                {/* Scroll Anchor */}
+                <div ref={EndRef} className="h-4 w-full" />
+            </div>
         </div>
     );
 };
